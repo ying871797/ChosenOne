@@ -9,3 +9,13 @@ node_modules/
 
 # 系统
 Thumbs.db
+
+# 运行时数据（安装后由用户维护，首启自动生成示例）
+names.txt
+excluded.txt
+
+# 构建/调试日志（agent 工作流产生）
+*.log
+src-tauri/out.log
+src-tauri/err.log
+src-tauri/test-output.txt

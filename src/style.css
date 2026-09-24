@@ -1,0 +1,306 @@
+/* ===== 天选之子 · 样式 ===== */
+/* 双主题由 data-theme 属性 + CSS 变量驱动 */
+
+:root {
+  /* dark 主题（默认） */
+  --bg: #12141f;
+  --surface: #1b1e2d;
+  --surface-2: #242839;
+  --text: #e8eaf2;
+  --text-dim: #9aa3b8;
+  --accent: #e6b800;
+  --accent-soft: rgba(230, 184, 0, 0.15);
+  --hot: #ffd75e;
+  --danger: #e05e5e;
+  --radius: 14px;
+  --shadow: 0 8px 30px rgba(0, 0, 0, 0.35);
+}
+
+body[data-theme="light"] {
+  --bg: #f5f6fa;
+  --surface: #ffffff;
+  --surface-2: #eceef4;
+  --text: #23262f;
+  --text-dim: #6b7280;
+  --accent: #b8860b;
+  --accent-soft: rgba(184, 134, 11, 0.12);
+  --hot: #8a6700;
+  --danger: #c0392b;
+  --shadow: 0 8px 30px rgba(0, 0, 0, 0.12);
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body { height: 100%; }
+
+body {
+  font-family: "Segoe UI", "Microsoft YaHei", "PingFang SC", sans-serif;
+  color: var(--text);
+  background-color: var(--bg);
+  background-size: cover;
+  background-position: center;
+  transition: background-color 0.3s ease, color 0.3s ease;
+  user-select: none;
+  overflow: hidden;
+}
+
+/* 背景遮罩层：保证背景图下文字可读 */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  background: var(--bg);
+  opacity: 0.65;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.app { position: relative; z-index: 1; }
+
+/* ---------- 顶栏 ---------- */
+.topbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 22px;
+}
+
+.title {
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  background: linear-gradient(90deg, var(--accent), var(--hot));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.toolbar { display: flex; gap: 10px; }
+
+.icon-btn {
+  width: 38px;
+  height: 38px;
+  border: 1px solid var(--surface-2);
+  border-radius: 10px;
+  background: var(--surface);
+  color: var(--text);
+  font-size: 17px;
+  cursor: pointer;
+  transition: transform 0.15s ease, background 0.2s ease;
+}
+
+.icon-btn:hover { transform: translateY(-2px); background: var(--surface-2); }
+
+/* ---------- 老虎机舞台 ---------- */
+.stage {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  flex: 1;
+  padding: 0 24px;
+}
+
+.slot-viewport {
+  position: relative;
+  width: 100%;
+  max-width: 380px;
+  height: 240px;
+  overflow: hidden;
+  border-radius: var(--radius);
+  background: var(--surface);
+  box-shadow: var(--shadow);
+  border: 2px solid var(--accent-soft);
+}
+
+.slot-list {
+  position: absolute;
+  inset: 0;
+  will-change: transform;
+}
+
+.slot-row {
+  height: 80px; /* viewport 240 = 3 行 × 80 */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 42px;
+  font-weight: 800;
+  letter-spacing: 2px;
+  color: var(--text-dim);
+}
+
+/* 目标行（中间第 3 行）高亮 */
+.slot-row.center {
+  color: var(--accent);
+  font-size: 46px;
+  text-shadow: 0 0 24px var(--accent-soft);
+}
+
+/* 上下渐变遮罩：边缘雾化，形成"3 行窗口"景深 */
+.slot-mask {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 40px;
+  pointer-events: none;
+}
+
+.top-mask {
+  top: 0;
+  background: linear-gradient(to bottom, var(--surface) 30%, transparent);
+}
+
+.bottom-mask {
+  bottom: 0;
+  background: linear-gradient(to top, var(--surface) 30%, transparent);
+}
+
+.status-hint {
+  margin-top: 18px;
+  font-size: 14px;
+  color: var(--text-dim);
+  min-height: 20px;
+}
+
+/* 抽中动画（金色描边 + 放大） */
+.slot-row.hit {
+  animation: hit-pop 0.6s ease-out;
+  color: var(--hot);
+  text-shadow: 0 0 30px var(--accent);
+}
+
+@keyframes hit-pop {
+  0%   { transform: scale(1.15); opacity: 0.8; }
+  60%  { transform: scale(0.96); opacity: 1; }
+  100% { transform: scale(1); }
+}
+
+/* ---------- 控制区 ---------- */
+.controls {
+  padding: 24px 28px 28px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.draw-btn {
+  width: 100%;
+  padding: 18px 0;
+  font-size: 22px;
+  font-weight: 800;
+  letter-spacing: 3px;
+  color: #16181f;
+  background: linear-gradient(135deg, var(--accent), var(--hot));
+  border: none;
+  border-radius: var(--radius);
+  cursor: pointer;
+  box-shadow: var(--shadow);
+  transition: transform 0.15s ease, filter 0.2s ease;
+}
+
+.draw-btn:hover:not(:disabled) { transform: translateY(-2px); filter: brightness(1.06); }
+
+.draw-btn:disabled {
+  background: var(--surface-2);
+  color: var(--text-dim);
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+.statusbar {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 16px;
+  font-size: 13px;
+  color: var(--text-dim);
+}
+
+.reset-btn {
+  padding: 6px 14px;
+  border: 1px solid var(--surface-2);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text);
+  cursor: pointer;
+  font-size: 13px;
+  transition: background 0.2s ease;
+}
+
+.reset-btn:hover { background: var(--surface-2); }
+
+/* ---------- 设置面板 ---------- */
+.overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10;
+}
+
+.panel {
+  background: var(--surface);
+  border-radius: var(--radius);
+  padding: 26px 30px;
+  width: 340px;
+  box-shadow: var(--shadow);
+}
+
+.panel h2 { margin-bottom: 20px; font-size: 20px; }
+
+.field { margin-bottom: 22px; }
+
+.field label {
+  display: block;
+  font-size: 13px;
+  color: var(--text-dim);
+  margin-bottom: 10px;
+}
+
+.seg { display: flex; gap: 8px; }
+
+.seg-btn {
+  flex: 1;
+  padding: 10px 0;
+  border: 1px solid var(--surface-2);
+  border-radius: 10px;
+  background: var(--surface-2);
+  color: var(--text);
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.seg-btn.active {
+  background: var(--accent);
+  color: #16181f;
+  font-weight: 700;
+  border-color: var(--accent);
+}
+
+.field input[type="text"] {
+  width: 100%;
+  padding: 11px 14px;
+  border: 1px solid var(--surface-2);
+  border-radius: 10px;
+  background: var(--surface-2);
+  color: var(--text);
+  font-size: 14px;
+  margin-bottom: 10px;
+}
+
+.ghost-btn {
+  width: 100%;
+  padding: 10px 0;
+  border: 1px solid var(--surface-2);
+  border-radius: 10px;
+  background: transparent;
+  color: var(--text);
+  cursor: pointer;
+  font-size: 14px;
+  margin-top: 6px;
+}
+
+.ghost-btn:hover { background: var(--surface-2); }

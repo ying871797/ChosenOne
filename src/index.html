@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>天选之子 · ChosenOne</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body data-theme="dark">
+  <div class="app">
+    <!-- 顶栏 -->
+    <header class="topbar">
+      <h1 class="title">🎲 天选之子</h1>
+      <div class="toolbar">
+        <button id="themeBtn" class="icon-btn" title="切换主题">🌗</button>
+        <button id="settingsBtn" class="icon-btn" title="设置">⚙️</button>
+      </div>
+    </header>
+
+    <!-- 老虎机名字区 -->
+    <main class="stage">
+      <div class="slot-viewport">
+        <div class="slot-list" id="slotList">
+          <div class="slot-row"></div>
+          <div class="slot-row"></div>
+          <div class="slot-row"></div>
+          <div class="slot-row"></div>
+          <div class="slot-row"></div>
+        </div>
+        <!-- 目标行高亮玻璃 -->
+        <div class="slot-mask top-mask"></div>
+        <div class="slot-mask bottom-mask"></div>
+      </div>
+      <p class="status-hint" id="statusHint">准备就绪</p>
+    </main>
+
+    <!-- 主按钮 + 底部状态栏 -->
+    <footer class="controls">
+      <button id="drawBtn" class="draw-btn">🎲 抽取天选之子</button>
+      <div class="statusbar">
+        <span id="pickedCount">已点名 0/0</span>
+        <span id="excludedCount">已排除 0</span>
+        <button id="resetBtn" class="reset-btn">🔄 重置</button>
+      </div>
+    </footer>
+  </div>
+
+  <!-- 设置面板 -->
+  <div class="overlay" id="settingsOverlay" hidden>
+    <div class="panel">
+      <h2>设置</h2>
+      <div class="field">
+        <label>主题</label>
+        <div class="seg">
+          <button data-theme="dark" class="seg-btn">深色</button>
+          <button data-theme="light" class="seg-btn">浅色</button>
+        </div>
+      </div>
+      <div class="field">
+        <label>背景图片文件名（放入应用目录）</label>
+        <input type="text" id="bgInput" placeholder="如 bg_custom.png，留空为默认">
+        <button id="openDirBtn" class="ghost-btn">📂 打开应用目录</button>
+      </div>
+      <button id="panelCloseBtn" class="ghost-btn">关闭</button>
+    </div>
+  </div>
+
+  <script src="api.js"></script>
+  <script src="main.js"></script>
+</body>
+</html>

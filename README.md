@@ -27,7 +27,9 @@
 ```bash
 npm install                 # 安装 Tauri CLI
 npm run tauri dev           # 开发模式
-npm run tauri build         # 打包（NSIS 安装器 + 便携版）
+npm run tauri build         # 打包：NSIS 每用户安装器
+npx tauri build --no-bundle # 便携版：产出自包含 exe（target\release\chosenone.exe）
+                            # 拷到任意目录运行，名单文件与其同目录
 ```
 
 ## 目录结构

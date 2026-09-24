@@ -7,7 +7,6 @@ mod watcher;
 use std::path::PathBuf;
 
 use serde::Serialize;
-use tauri::Manager;
 
 use crate::watcher::RosterPayload;
 
@@ -20,9 +19,16 @@ pub struct Roster {
 }
 
 /// 应用目录的辅助定位：可执行文件所在目录。
-fn app_dir(app: &tauri::AppHandle) -> PathBuf {
-    if let Ok(dir) = app.path().executable_dir() {
-        return dir;
+///
+/// ⚠️ 注意：不能用 `app.path().executable_dir()` —— Tauri v2 在 Windows 上
+/// **明确不支持**该方法（`dirs::executable_dir()` 返回 None → Err），会回退到
+/// 工作目录导致数据文件落到启动目录而非 exe 目录。改用 `std::env::current_exe()`：
+/// 返回可执行文件绝对路径，与 cwd 无关，打包后恰好是 exe 同级目录。
+fn app_dir(_app: &tauri::AppHandle) -> PathBuf {
+    if let Ok(exe) = std::env::current_exe() {
+        if let Some(parent) = exe.parent() {
+            return parent.to_path_buf();
+        }
     }
     // 兜底：当前工作目录
     std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."))

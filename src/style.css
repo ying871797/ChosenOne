@@ -241,6 +241,13 @@ body::before {
   z-index: 10;
 }
 
+/* ⚠️ 关键：`hidden` 属性只靠 UA 样式表 `[hidden]{display:none}` 生效，
+ *    而上面 `.overlay{display:flex}` 特异性相同(0,1,0)且作者样式优先 → 会覆盖隐藏。
+ *    这里显式补 `.overlay[hidden]{display:none}`(0,2,0)，确保设置面板能真正关闭。 */
+.overlay[hidden] {
+  display: none;
+}
+
 .panel {
   background: var(--surface);
   border-radius: var(--radius);

@@ -36,3 +36,10 @@ pub fn temp_write(prefix: &str, bytes: &[u8]) -> PathBuf {
 pub fn temp_path(prefix: &str) -> PathBuf {
     unique_path(prefix, "tmp")
 }
+
+/// 创建并返回一个唯一的临时目录。
+pub fn temp_dir(prefix: &str) -> PathBuf {
+    let p = unique_path(prefix, "dir");
+    std::fs::create_dir(&p).unwrap();
+    p
+}

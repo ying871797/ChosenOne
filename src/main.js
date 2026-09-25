@@ -12,6 +12,11 @@
   let excluded = [];      // 排除名单
   let picked = new Set(); // 已点名（会话内存，重启即重置）
   let isDrawing = false;  // 正在滚动动画
+  let rosterRevision = 0; // 每次合法名单变更递增，防止旧异步结果覆盖新状态
+  let rosterLoadError = false; // 名单 IPC/事件无效时暂停抽取，等待下一份合法名单
+  let initCoreError = false; // 监听/watcher 初始化失败后，名单状态提示保持最高优先级
+  let statusPriority = 0; // 0 普通、10 设置/背景提示、20 抽取结果、40 名单核心错误
+  let statusOwner = "roster"; // 当前状态提示的归属子系统，用于精确清除
 
   // ---------- DOM ----------
   const slotList = document.getElementById("slotList");
@@ -30,11 +35,93 @@
   const segBtns = Array.from(document.querySelectorAll(".seg-btn[data-theme]"));
   const schemeSegBtns = Array.from(document.querySelectorAll(".seg-btn[data-scheme]"));
 
-  // ---------- 可抽池 ----------
+  const STATUS_NOTICE = 10;
+  const STATUS_DRAW = 20;
+  const STATUS_CORE = 40;
+  const OWNER_ROSTER = "roster";
+  const OWNER_DRAW = "draw";
+  const OWNER_CORE = "core";
+  const OWNER_NOTICE_SETTINGS = "notice:settings";
+  const OWNER_NOTICE_BACKGROUND = "notice:background";
+
+  /** 写入状态提示：低优先级不得覆盖高优先级，避免迟到的异步提示盖掉名单/抽取结果。 */
+  function setStatus(message, priority = 0, owner = OWNER_ROSTER) {
+    if (priority < statusPriority) return false;
+    statusPriority = priority;
+    statusOwner = owner;
+    statusHint.textContent = message;
+    return true;
+  }
+
+  /** 只有同一子系统的成功操作才能清掉它自己的提示；其他子系统的提示保持可见。 */
+  function clearNoticeStatus(owner) {
+    if (statusOwner !== owner) return false;
+    statusPriority = 0;
+    statusOwner = OWNER_ROSTER;
+    return true;
+  }
+
+  /** 名单更新只取代普通/抽取状态，不得抹掉设置与背景的错误提示。 */
+  function clearRosterStatus() {
+    if (initCoreError) return;
+    if (statusOwner === OWNER_NOTICE_SETTINGS || statusOwner === OWNER_NOTICE_BACKGROUND) return;
+    statusPriority = 0;
+    statusOwner = OWNER_ROSTER;
+  }
+
+  // ---------- 名单校验与可抽池 ----------
+  function normalizeNameList(value, label) {
+    if (!Array.isArray(value)) {
+      throw new TypeError(`${label} 必须是字符串数组`);
+    }
+
+    const seen = new Set();
+    return value.map((name, index) => {
+      if (typeof name !== "string" || name.length === 0 || name.trim() !== name) {
+        throw new TypeError(`${label}[${index}] 不是合法名字`);
+      }
+      if (seen.has(name)) return null;
+      seen.add(name);
+      return name;
+    }).filter((name) => name !== null);
+  }
+
+  function applyRoster(payload) {
+    if (!payload || typeof payload !== "object") {
+      throw new TypeError("名单负载必须是对象");
+    }
+    const nextNames = normalizeNameList(payload.names, "names");
+    const nextExcluded = normalizeNameList(payload.excluded, "excluded");
+    allNames = nextNames;
+    excluded = nextExcluded;
+    rosterRevision += 1;
+    rosterLoadError = false;
+    clearRosterStatus();
+    refreshStatus();
+  }
+
+  function showRosterError(message) {
+    rosterLoadError = true;
+    rosterRevision += 1;
+    drawBtn.disabled = true;
+    setStatus(message, STATUS_CORE, OWNER_CORE);
+  }
+
+  function getRosterStats() {
+    const excludedSet = new Set(excluded);
+    const eligible = allNames.filter((name) => !excludedSet.has(name));
+    const pool = eligible.filter((name) => !picked.has(name));
+    return {
+      eligible,
+      pool,
+      excludedInRoster: allNames.length - eligible.length,
+      pickedInRoster: eligible.filter((name) => picked.has(name)).length,
+    };
+  }
+
   /** 可抽池 = 名单 − 排除 − 已点名 */
   function getPool() {
-    const excludedSet = new Set(excluded);
-    return allNames.filter((n) => !excludedSet.has(n) && !picked.has(n));
+    return getRosterStats().pool;
   }
 
   /** 随机取一个，空池返回 null */
@@ -54,27 +141,28 @@
 
   // ---------- 更新界面状态 ----------
   function refreshStatus() {
-    const pool = getPool();
-    // 应点名总人数 = 名单数 − 命中名单中的排除数。
-    // excluded.txt 可能含名单外名字，直接用 excluded.length 会算小甚至为负。
-    const excludedInRoster = excluded.filter((n) => allNames.includes(n)).length;
+    if (rosterLoadError || initCoreError) {
+      drawBtn.disabled = true;
+      return;
+    }
+    const { pool, excludedInRoster, pickedInRoster } = getRosterStats();
     const total = allNames.length - excludedInRoster;
-    pickedCount.textContent = `已点名 ${picked.size}/${total}`;
+    pickedCount.textContent = `已点名 ${pickedInRoster}/${total}`;
     excludedCount.textContent = `已排除 ${excludedInRoster}`;
 
     if (allNames.length === 0) {
-      statusHint.textContent = "名单为空，请在应用目录创建 names.txt";
+      setStatus("名单为空，请在应用目录创建 names.txt");
       drawBtn.disabled = true;
     } else if (pool.length === 0) {
       // 区分"全被排除/点名"与"无名单"
       if (excludedInRoster >= allNames.length) {
-        statusHint.textContent = "所有人均在排除名单中，无可抽对象";
+        setStatus("所有人均在排除名单中，无可抽对象");
       } else {
-        statusHint.textContent = "全部已点名，请点击重置";
+        setStatus("全部已点名，请点击重置");
       }
       drawBtn.disabled = true;
     } else {
-      statusHint.textContent = isDrawing ? "抽选中…" : `可抽 ${pool.length} 人`;
+      setStatus(isDrawing ? "抽选中…" : `可抽 ${pool.length} 人`);
       drawBtn.disabled = isDrawing;
     }
   }
@@ -199,28 +287,54 @@
       refreshStatus();
       return;
     }
+    if (!initCoreError && !rosterLoadError) {
+      // 用户主动抽取：显式取代此前所有非核心提示。
+      statusPriority = 0;
+      statusOwner = OWNER_ROSTER;
+    }
+    const drawRevision = rosterRevision;
 
     await rollTo(target);
+
+    // 名单在动画期间变化时，旧目标已不再属于本次抽取；不能提交为赢家。
+    if (drawRevision !== rosterRevision) {
+      isDrawing = false;
+      resetReel();
+      refreshStatus();
+      if (rosterLoadError) {
+        setStatus("名单更新失败", STATUS_CORE, OWNER_CORE);
+      } else {
+        setStatus("名单已更新，本次抽取已取消", STATUS_DRAW, OWNER_DRAW);
+      }
+      return;
+    }
 
     // 抽中加入已点名
     picked.add(target);
     isDrawing = false;
     refreshStatus();
-    statusHint.textContent = `🏆 天选之子：${target}`;
+    setStatus(`🏆 天选之子：${target}`, STATUS_DRAW, OWNER_DRAW);
   }
 
   // ---------- 重置 ----------
-  function onReset() {
-    // 动画播放中忽略重置：避免动画结束后被 onDraw 收尾覆盖（picked 误加一人、状态被改写）
-    if (isDrawing) return;
-    picked.clear();
-    // 复位老虎机（中央行显示骰子）
+  function resetReel() {
     rows.forEach((row, i) => {
       row.classList.remove("center", "hit");
       row.style.fontSize = "";
       row.textContent = i === CENTER ? "🎲" : "";
     });
     slotList.style.transform = "translateY(0px)";
+  }
+
+  function onReset() {
+    // 动画播放中忽略重置：避免动画结束后被 onDraw 收尾覆盖（picked 误加一人、状态被改写）
+    if (isDrawing) return;
+    picked.clear();
+    resetReel();
+    if (!initCoreError && !rosterLoadError) {
+      statusPriority = 0;
+      statusOwner = OWNER_ROSTER;
+    }
     refreshStatus();
   }
 
@@ -240,85 +354,247 @@
   }
 
   // ---------- 主题与设置 ----------
+  /** 设置读取失败后，任何视觉状态或写回都必须先中止（回退输入框到仍有效的磁盘设置）。 */
+  function throwIfSettingsLoadFailed() {
+    if (!settingsLoadFailed) return;
+    bgInput.value = currentSettings.background;
+    setStatus("读取设置失败", STATUS_NOTICE, OWNER_NOTICE_SETTINGS);
+    throw new Error("设置读取失败");
+  }
+
   async function applyTheme(theme) {
+    throwIfSettingsLoadFailed();
+    settingsRevision += 1;
     document.body.dataset.theme = theme;
     segBtns.forEach((b) => b.classList.toggle("active", b.dataset.theme === theme));
     await saveCurrentSettings({ theme });
+    clearNoticeStatus(OWNER_NOTICE_SETTINGS);
+    refreshStatus();
   }
 
   // 界面方案：mist / chalk（晨雾林窗 / 绿板粉笔）
   async function applyScheme(scheme) {
+    throwIfSettingsLoadFailed();
+    settingsRevision += 1;
     document.body.dataset.scheme = scheme;
     schemeSegBtns.forEach((b) => b.classList.toggle("active", b.dataset.scheme === scheme));
     await saveCurrentSettings({ scheme });
+    clearNoticeStatus(OWNER_NOTICE_SETTINGS);
+    refreshStatus();
   }
 
   async function applyBackground(filename) {
+    throwIfSettingsLoadFailed();
+    settingsRevision += 1;
+    const requestRevision = ++backgroundRequestRevision;
+    const requestState = { revision: requestRevision, settled: false, applied: false };
+    latestBackgroundRequest = requestState;
     if (filename) {
+      let dataUrl;
       try {
-        const dataUrl = await API.readBackground(filename);
-        if (dataUrl) {
-          document.body.style.backgroundImage = `url("${dataUrl}")`;
-          await saveCurrentSettings({ background: filename });
-          return;
-        }
-        statusHint.textContent = `未找到背景图片：${filename}`;
+        dataUrl = await API.readBackground(filename);
       } catch (e) {
+        if (requestRevision !== backgroundRequestRevision) return;
+        requestState.settled = true;
+        // 设置读取失败优先：禁止用新背景覆盖仍有效的旧视觉状态。
+        throwIfSettingsLoadFailed();
+        // IPC/权限等瞬时错误不应删除仍然有效的背景设置。
         console.warn("读取背景图片失败", e);
-        statusHint.textContent = "背景图片读取失败";
+        bgInput.value = currentSettings.background;
+        setStatus("背景图片读取失败", STATUS_NOTICE, OWNER_NOTICE_BACKGROUND);
+        return;
       }
-      // 处理失败则回退默认背景
+      if (requestRevision !== backgroundRequestRevision) return;
+      requestState.settled = true;
+      // 读取期间设置加载可能失败；此时不得推进版本或修改视觉状态。
+      throwIfSettingsLoadFailed();
+      if (dataUrl) {
+        requestState.applied = true;
+        lastAppliedBackgroundRevision = requestRevision;
+        document.body.style.backgroundImage = `url("${dataUrl}")`;
+        await saveCurrentSettings({ background: filename });
+        clearNoticeStatus(OWNER_NOTICE_BACKGROUND);
+        refreshStatus();
+        return;
+      }
+      requestState.applied = true;
+      lastAppliedBackgroundRevision = requestRevision;
+      setStatus(`未找到背景图片：${filename}`, STATUS_NOTICE, OWNER_NOTICE_BACKGROUND);
+      // 明确返回 null 表示文件不存在，回退默认背景并清除设置。
       document.body.style.backgroundImage = "";
       await saveCurrentSettings({ background: "" });
     } else {
+      requestState.settled = true;
+      requestState.applied = true;
+      lastAppliedBackgroundRevision = requestRevision;
       document.body.style.backgroundImage = "";
       await saveCurrentSettings({ background: "" });
+      clearNoticeStatus(OWNER_NOTICE_BACKGROUND);
+      refreshStatus();
     }
   }
 
   let currentSettings = { theme: "dark", scheme: "mist", background: "" };
+  let settingsSaveTail = Promise.resolve();
+  let settingsRevision = 0;
+  let settingsLoadPatches = null;
+  let settingsLoadFailed = false;
+  let backgroundRequestRevision = 0;
+  let latestBackgroundRequest = null;
+  let lastAppliedBackgroundRevision = 0;
 
   async function saveCurrentSettings(patch) {
-    currentSettings = { ...currentSettings, ...patch };
+    throwIfSettingsLoadFailed();
+    if (settingsLoadPatches) Object.assign(settingsLoadPatches, patch);
+    const snapshot = { ...currentSettings, ...patch };
+    currentSettings = snapshot;
+
+    // 只让相邻保存相互等待；队列本身吞掉失败，调用者仍收到本次保存的真实结果。
+    const savePromise = settingsSaveTail
+      .catch(() => undefined)
+      .then(() => {
+        // 任务入队时设置可能尚未加载完成；真正执行前必须再次阻断写回。
+        throwIfSettingsLoadFailed();
+        return API.saveSettings(snapshot);
+      });
+    settingsSaveTail = savePromise.catch(() => undefined);
+
     try {
-      await API.saveSettings(currentSettings);
+      await savePromise;
+      clearNoticeStatus(OWNER_NOTICE_SETTINGS);
     } catch (e) {
       console.warn("保存设置失败", e);
+      if (settingsLoadFailed) {
+        setStatus("读取设置失败", STATUS_NOTICE, OWNER_NOTICE_SETTINGS);
+      } else {
+        setStatus("设置保存失败", STATUS_NOTICE, OWNER_NOTICE_SETTINGS);
+      }
+      throw e;
     }
   }
 
   async function loadAndApplySettings() {
+    const loadRevision = settingsRevision;
+    const backgroundLoadRevision = backgroundRequestRevision;
+    settingsLoadPatches = {};
+    settingsLoadFailed = false;
+    let loadedSettings = null;
+    let settingsWarning = "";
+
     try {
-      currentSettings = await API.loadSettings();
+      const loaded = await API.loadSettings();
+      loadedSettings = {
+        theme: loaded?.theme === "light" ? "light" : "dark",
+        scheme: loaded?.scheme === "chalk" ? "chalk" : "mist",
+        background: typeof loaded?.background === "string" ? loaded.background : "",
+      };
     } catch (e) {
+      settingsLoadFailed = true;
+      settingsWarning = "读取设置失败";
       console.warn("加载设置失败", e);
+      setStatus(settingsWarning, STATUS_NOTICE, OWNER_NOTICE_SETTINGS);
     }
-    document.body.dataset.theme = currentSettings.theme || "dark";
-    segBtns.forEach((b) =>
-      b.classList.toggle("active", b.dataset.theme === (currentSettings.theme || "dark"))
-    );
-    document.body.dataset.scheme = currentSettings.scheme || "mist";
-    schemeSegBtns.forEach((b) =>
-      b.classList.toggle("active", b.dataset.scheme === (currentSettings.scheme || "mist"))
-    );
-    if (currentSettings.background) {
-      const dataUrl = await API.readBackground(currentSettings.background);
-      if (dataUrl) {
-        document.body.style.backgroundImage = `url("${dataUrl}")`;
+
+    const changedDuringLoad = loadRevision !== settingsRevision;
+    const userPatches = { ...settingsLoadPatches };
+    settingsLoadPatches = null;
+
+    if (loadedSettings && changedDuringLoad) {
+      // 初始化期间的用户操作优先于尚未到达的默认值，但未修改字段必须保留加载结果。
+      currentSettings = { ...loadedSettings, ...userPatches };
+      if (Object.keys(userPatches).length > 0) {
+        // 补偿保存仍进入队列，但设置 IPC 卡住也不能阻断名单、监听器和 watcher 初始化。
+        void saveCurrentSettings(userPatches).catch(() => undefined);
+      }
+    } else if (loadedSettings) {
+      currentSettings = loadedSettings;
+    }
+
+    if (changedDuringLoad && !loadedSettings) return settingsWarning;
+    document.body.dataset.theme = currentSettings.theme;
+    segBtns.forEach((b) => b.classList.toggle("active", b.dataset.theme === currentSettings.theme));
+    document.body.dataset.scheme = currentSettings.scheme;
+    schemeSegBtns.forEach((b) => b.classList.toggle("active", b.dataset.scheme === currentSettings.scheme));
+    const newerBackgroundRequest =
+      latestBackgroundRequest && latestBackgroundRequest.revision > backgroundLoadRevision
+        ? latestBackgroundRequest
+        : null;
+    if (!newerBackgroundRequest || newerBackgroundRequest.settled) {
+      bgInput.value = currentSettings.background;
+    }
+
+    let backgroundWarning = "";
+    if (currentSettings.background && !newerBackgroundRequest?.applied) {
+      const requestRevision = backgroundLoadRevision;
+      try {
+        const dataUrl = await API.readBackground(currentSettings.background);
+        const latestRequest = latestBackgroundRequest;
+        if (
+          requestRevision < lastAppliedBackgroundRevision ||
+          (requestRevision !== backgroundRequestRevision &&
+            latestRequest &&
+            latestRequest.revision > requestRevision &&
+            latestRequest.applied)
+        ) {
+          return "";
+        }
+        if (dataUrl) {
+          document.body.style.backgroundImage = `url("${dataUrl}")`;
+        } else {
+          document.body.style.backgroundImage = "";
+          backgroundWarning = `未找到背景图片：${currentSettings.background}`;
+          setStatus(backgroundWarning, STATUS_NOTICE, OWNER_NOTICE_BACKGROUND);
+        }
+      } catch (e) {
+        const latestRequest = latestBackgroundRequest;
+        if (
+          requestRevision < lastAppliedBackgroundRevision ||
+          (requestRevision !== backgroundRequestRevision &&
+            latestRequest &&
+            latestRequest.revision > requestRevision &&
+            latestRequest.applied)
+        ) {
+          return "";
+        }
+        console.warn("读取背景图片失败", e);
+        document.body.style.backgroundImage = "";
+        backgroundWarning = "背景图片读取失败";
+        setStatus(backgroundWarning, STATUS_NOTICE, OWNER_NOTICE_BACKGROUND);
       }
     }
+    return backgroundWarning || settingsWarning;
   }
 
   // ---------- 文件变化同步 ----------
-  async function refreshRoster() {
+  function handleRosterChanged(payload) {
+    try {
+      applyRoster(payload);
+    } catch (e) {
+      // 畸形事件不能替换上一份合法名单，也不能让事件回调抛出未处理异常。
+      console.warn("名单更新失败", e);
+      showRosterError("名单更新失败");
+    }
+  }
+
+  async function refreshRoster(syncBaseline = rosterRevision) {
+    const requestRevision = rosterRevision;
     try {
       const roster = await API.getRoster();
-      allNames = roster.names || [];
-      excluded = roster.excluded || [];
-      refreshStatus();
+
+      // 监听建立后已经收到过事件时，初始读取可能来自旧快照，不能回退状态。
+      if (requestRevision !== rosterRevision || syncBaseline !== rosterRevision) {
+        return true;
+      }
+      applyRoster(roster);
+      return true;
     } catch (e) {
+      // 新事件已经提供了更新时，不让旧请求的错误覆盖它。
+      if (requestRevision !== rosterRevision || syncBaseline !== rosterRevision) {
+        return true;
+      }
       console.error("读取名单失败", e);
-      statusHint.textContent = "读取名单失败";
+      showRosterError("读取名单失败");
+      return false;
     }
   }
 
@@ -346,38 +622,79 @@
     // 应用布局缩放（resize 由上方监听实时更新）
     applyLayoutScale();
 
-    // 构建条带行（行数 = 滚动序列长度）
+    // 在首次 await 前完成初始复位，之后初始化期间完成的抽取不会被擦除。
     buildSlotRows();
+    resetReel();
 
-    // 加载设置
-    await loadAndApplySettings();
+    // 设置/背景属于非核心链路；即使 IPC 长时间未返回，也要先启动名单同步。
+    let backgroundWarning = "";
+    let coreReadyForBackgroundWarning = false;
+    void loadAndApplySettings()
+      .then((warning) => {
+        if (warning) backgroundWarning = warning;
+        if (warning && coreReadyForBackgroundWarning) {
+          setStatus(warning, STATUS_NOTICE, warning === "读取设置失败" ? OWNER_NOTICE_SETTINGS : OWNER_NOTICE_BACKGROUND);
+        }
+      })
+      .catch((e) => console.warn("加载设置失败", e));
+    const syncBaseline = rosterRevision;
 
-    // 首次读取名单
-    await refreshRoster();
+    // 必须先等待监听注册，再启动 watcher，最后读取一次权威名单。
+    let listenerReady = false;
+    try {
+      await API.onRosterChanged(handleRosterChanged);
+      listenerReady = true;
+    } catch (e) {
+      console.error("名单同步监听失败", e);
+    }
 
-    // 启动文件监视
+    let watcherReady = false;
     try {
       await API.watchRosterFiles();
-      API.onRosterChanged((payload) => {
-        allNames = payload.names || [];
-        excluded = payload.excluded || [];
-        // 名单变化不影响已点名（picked 保留，符合会话语义）
-        refreshStatus();
-      });
+      watcherReady = true;
     } catch (e) {
       console.error("启动文件监视失败", e);
     }
 
-    // 初始复位老虎机
-    onReset();
+    const rosterLoaded = await refreshRoster(syncBaseline);
+    coreReadyForBackgroundWarning = rosterLoaded && listenerReady && watcherReady;
+
+    if (!rosterLoaded) return;
+    if (!listenerReady) {
+      initCoreError = true;
+      setStatus("名单同步监听失败", STATUS_CORE, OWNER_CORE);
+      return;
+    }
+    if (!watcherReady) {
+      initCoreError = true;
+      setStatus("名单已读取，但自动同步失败", STATUS_CORE, OWNER_CORE);
+      return;
+    }
+    if (backgroundWarning) {
+      setStatus(
+        backgroundWarning,
+        STATUS_NOTICE,
+        backgroundWarning === "读取设置失败" ? OWNER_NOTICE_SETTINGS : OWNER_NOTICE_BACKGROUND
+      );
+      return;
+    }
+    refreshStatus();
+  }
+
+  function handleSettingAction(action) {
+    const actionPromise = Promise.resolve().then(action);
+    // 事件系统会忽略返回的 Promise；先挂一个观察分支，避免真实页面出现未处理 rejection，
+    // 同时把原始 rejection 返回给测试和其他调用者。
+    actionPromise.catch((e) => console.warn("设置操作失败", e));
+    return actionPromise;
   }
 
   // ---------- 事件绑定 ----------
   drawBtn.addEventListener("click", onDraw);
   resetBtn.addEventListener("click", onReset);
-  themeBtn.addEventListener("click", async () => {
+  themeBtn.addEventListener("click", () => {
     const next = document.body.dataset.theme === "dark" ? "light" : "dark";
-    await applyTheme(next);
+    return handleSettingAction(() => applyTheme(next));
   });
   settingsBtn.addEventListener("click", () => (settingsOverlay.hidden = false));
   panelCloseBtn.addEventListener("click", () => (settingsOverlay.hidden = true));
@@ -385,12 +702,14 @@
     if (e.target === settingsOverlay) settingsOverlay.hidden = true;
   });
   segBtns.forEach((btn) =>
-    btn.addEventListener("click", () => applyTheme(btn.dataset.theme))
+    btn.addEventListener("click", () => handleSettingAction(() => applyTheme(btn.dataset.theme)))
   );
   schemeSegBtns.forEach((btn) =>
-    btn.addEventListener("click", () => applyScheme(btn.dataset.scheme))
+    btn.addEventListener("click", () => handleSettingAction(() => applyScheme(btn.dataset.scheme)))
   );
-  bgInput.addEventListener("change", () => applyBackground(bgInput.value.trim()));
+  bgInput.addEventListener("change", () =>
+    handleSettingAction(() => applyBackground(bgInput.value.trim()))
+  );
   openDirBtn.addEventListener("click", async () => {
     try {
       await API.openAppDir();
@@ -401,5 +720,8 @@
   });
 
   // 启动
-  init();
+  init().catch((e) => {
+    console.error("初始化失败", e);
+    showRosterError("初始化失败");
+  });
 })();

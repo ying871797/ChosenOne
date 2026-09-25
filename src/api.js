@@ -76,7 +76,9 @@
     onRosterChanged: (handler) => {
       const namespace = Tauri?.event || Tauri;
       const listenFn = namespace?.listen || Tauri?.listen;
-      if (!listenFn) return () => {};
+      if (typeof listenFn !== "function") {
+        return Promise.reject(new Error("Tauri 事件监听 API 不可用"));
+      }
       return listenFn.call(namespace, "roster-changed", (event) => {
         handler(event.payload);
       });
@@ -86,7 +88,13 @@
   // 有 Tauri 全局 API 且能取到 invoke 时用真实实现，否则用 mock
   // ⚠️ Tauri v2 的全局命名空间是分模块的：invoke 在 `__TAURI__.core.invoke`，
   //    v1 是扁平的 `__TAURI__.invoke`。两版都兼容，避免永远走 mock。
-  const invoke = Tauri?.core?.invoke ?? Tauri?.invoke;
+  const coreInvoke = Tauri?.core?.invoke;
+  const legacyInvoke = Tauri?.invoke;
+  const invoke = typeof coreInvoke === "function"
+    ? coreInvoke
+    : typeof legacyInvoke === "function"
+      ? legacyInvoke
+      : null;
   window.ChosenAPI = invoke ? real : createMock();
   window.__IS_BROWSER_PREVIEW__ = !invoke;
 })();

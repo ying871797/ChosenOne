@@ -4,7 +4,8 @@
   "description": "天选之子 — 桌面点名器",
   "private": true,
   "scripts": {
-    "tauri": "tauri"
+    "tauri": "tauri",
+    "test": "node --test tests/main.test.js tests/api.test.js"
   },
   "devDependencies": {
     "@tauri-apps/cli": "^2"

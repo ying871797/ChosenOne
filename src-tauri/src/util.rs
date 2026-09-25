@@ -12,19 +12,23 @@ pub fn base64_encode(data: &[u8]) -> String {
 
         out.push(TABLE[(n >> 18 & 0x3F) as usize] as char);
         out.push(TABLE[(n >> 12 & 0x3F) as usize] as char);
-        out.push(if chunk.len() > 1 { TABLE[(n >> 6 & 0x3F) as usize] as char } else { '=' });
-        out.push(if chunk.len() > 2 { TABLE[(n & 0x3F) as usize] as char } else { '=' });
+        out.push(if chunk.len() > 1 {
+            TABLE[(n >> 6 & 0x3F) as usize] as char
+        } else {
+            '='
+        });
+        out.push(if chunk.len() > 2 {
+            TABLE[(n & 0x3F) as usize] as char
+        } else {
+            '='
+        });
     }
     out
 }
 
 /// 由文件路径返回 data URL（data:image/...;base64,...）。
-/// 仅支持常见图片扩展名；文件不存在或读取失败返回 None。
-pub fn image_data_url(path: &std::path::Path) -> Option<String> {
-    let bytes = std::fs::read(path).ok()?;
-    if bytes.is_empty() {
-        return None;
-    }
+/// 仅支持常见图片扩展名；文件为空或格式不支持返回 `Ok(None)`，读取失败上抛。
+pub fn image_data_url(path: &std::path::Path) -> std::io::Result<Option<String>> {
     let ext = path
         .extension()
         .and_then(|e| e.to_str())
@@ -36,14 +40,24 @@ pub fn image_data_url(path: &std::path::Path) -> Option<String> {
         "gif" => "image/gif",
         "webp" => "image/webp",
         "bmp" => "image/bmp",
-        _ => return None,
+        _ => return Ok(None),
     };
-    Some(format!("data:{};base64,{}", mime, base64_encode(&bytes)))
+
+    let bytes = std::fs::read(path)?;
+    if bytes.is_empty() {
+        return Ok(None);
+    }
+    Ok(Some(format!(
+        "data:{};base64,{}",
+        mime,
+        base64_encode(&bytes)
+    )))
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::testutil::temp_dir;
 
     #[test]
     fn base64_basic_vectors() {
@@ -51,5 +65,15 @@ mod tests {
         assert_eq!(base64_encode(b"Man"), "TWFu");
         assert_eq!(base64_encode(b""), "");
         assert_eq!(base64_encode(&[0xFF, 0xEE, 0xDD]), "/+7d");
+    }
+
+    #[test]
+    fn image_read_errors_are_propagated() {
+        let dir = temp_dir("image-read-error");
+        let path = dir.join("broken.png");
+        std::fs::create_dir(&path).unwrap();
+
+        assert!(image_data_url(&path).is_err());
+        std::fs::remove_dir_all(dir).unwrap();
     }
 }

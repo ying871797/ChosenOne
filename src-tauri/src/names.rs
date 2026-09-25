@@ -60,39 +60,29 @@ pub fn ensure_names_file(path: &Path) -> io::Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::sync::atomic::{AtomicU32, Ordering};
-
-    static COUNTER: AtomicU32 = AtomicU32::new(0);
-
-    /// 在系统临时目录创建内容为 content 的临时文件，返回路径。
-    fn tempfile_with(content: &str) -> std::path::PathBuf {
-        let n = COUNTER.fetch_add(1, Ordering::SeqCst);
-        let p = std::env::temp_dir().join(format!("chosenone-test-{}-{}.txt", std::process::id(), n));
-        std::fs::write(&p, content).unwrap();
-        p
-    }
+    use crate::testutil::{temp_write, tempfile_with};
 
     #[test]
     fn parses_basic_names() {
-        let p = tempfile_with("张三\n李四\n王五\n");
+        let p = tempfile_with("names", "张三\n李四\n王五\n");
         assert_eq!(parse_names_file(&p), vec!["张三", "李四", "王五"]);
     }
 
     #[test]
     fn ignores_blank_lines_and_comments() {
-        let p = tempfile_with("张三\n\n# 注释\n李四\n   \n# 第二个注释\n");
+        let p = tempfile_with("names", "张三\n\n# 注释\n李四\n   \n# 第二个注释\n");
         assert_eq!(parse_names_file(&p), vec!["张三", "李四"]);
     }
 
     #[test]
     fn trims_whitespace() {
-        let p = tempfile_with("  张三  \n\t李四\n");
+        let p = tempfile_with("names", "  张三  \n\t李四\n");
         assert_eq!(parse_names_file(&p), vec!["张三", "李四"]);
     }
 
     #[test]
     fn dedupes_preserving_first_order() {
-        let p = tempfile_with("张三\n李四\n张三\n王五\n李四\n");
+        let p = tempfile_with("names", "张三\n李四\n张三\n王五\n李四\n");
         assert_eq!(parse_names_file(&p), vec!["张三", "李四", "王五"]);
     }
 
@@ -106,8 +96,7 @@ mod tests {
     fn decodes_gbk_content() {
         // "张三" 的 GBK 编码字节
         let gbk_bytes = [0xD5, 0xC5, 0xC8, 0xFD, b'\n'];
-        let p = std::path::PathBuf::from("gbk.tmp");
-        std::fs::write(&p, gbk_bytes).unwrap();
+        let p = temp_write("names", &gbk_bytes);
         assert_eq!(parse_names_file(&p), vec!["张三"]);
         std::fs::remove_file(&p).ok();
     }
@@ -117,20 +106,19 @@ mod tests {
         // 记事本保存的 UTF-8 带 BOM：EF BB BF 张三
         let mut bytes = vec![0xEF, 0xBB, 0xBF];
         bytes.extend_from_slice("张三\n李四\n".as_bytes());
-        let p = std::path::PathBuf::from("bom.tmp");
-        std::fs::write(&p, bytes).unwrap();
+        let p = temp_write("names", &bytes);
         assert_eq!(parse_names_file(&p), vec!["张三", "李四"]);
         std::fs::remove_file(&p).ok();
     }
 
     #[test]
     fn ensure_creates_when_missing_and_skips_when_exists() {
-        let p = tempfile_with("已有");
+        let p = tempfile_with("names", "已有");
         ensure_names_file(&p).unwrap();
         // 已存在时不覆盖
         assert_eq!(parse_names_file(&p), vec!["已有"]);
 
-        let missing = std::path::PathBuf::from("ensure-missing.tmp");
+        let missing = crate::testutil::temp_path("names");
         std::fs::remove_file(&missing).ok();
         ensure_names_file(&missing).unwrap();
         assert!(!parse_names_file(&missing).is_empty());

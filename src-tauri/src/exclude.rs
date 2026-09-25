@@ -12,20 +12,11 @@ pub fn parse_exclude_file(path: &Path) -> Vec<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::sync::atomic::{AtomicU32, Ordering};
-
-    static COUNTER: AtomicU32 = AtomicU32::new(0);
-
-    fn tempfile_with(content: &str) -> std::path::PathBuf {
-        let n = COUNTER.fetch_add(1, Ordering::SeqCst);
-        let p = std::env::temp_dir().join(format!("chosenone-excl-{}-{}.txt", std::process::id(), n));
-        std::fs::write(&p, content).unwrap();
-        p
-    }
+    use crate::testutil::tempfile_with;
 
     #[test]
     fn parses_exclude_list() {
-        let p = tempfile_with("张三\n李四\n");
+        let p = tempfile_with("excl", "张三\n李四\n");
         assert_eq!(parse_exclude_file(&p), vec!["张三", "李四"]);
     }
 
@@ -37,7 +28,7 @@ mod tests {
 
     #[test]
     fn dedupes_and_ignores_comments() {
-        let p = tempfile_with("# 请假\n张三\n李四\n张三\n");
+        let p = tempfile_with("excl", "# 请假\n张三\n李四\n张三\n");
         assert_eq!(parse_exclude_file(&p), vec!["张三", "李四"]);
     }
 }

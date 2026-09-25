@@ -36,6 +36,11 @@ pub fn load_settings(path: &Path) -> Settings {
     if !matches!(settings.scheme.as_str(), "mist" | "chalk") {
         settings.scheme = "mist".to_string();
     }
+    // theme 做同样白名单归一化：未知/缺省回落 `dark`，
+    // 避免非法值导致前端 body[data-theme="xxx"] 匹配不到 CSS 变量。
+    if !matches!(settings.theme.as_str(), "dark" | "light") {
+        settings.theme = "dark".to_string();
+    }
     settings
 }
 
@@ -47,38 +52,31 @@ pub fn save_settings(path: &Path, settings: &Settings) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::sync::atomic::{AtomicU32, Ordering};
-
-    static COUNTER: AtomicU32 = AtomicU32::new(0);
-
-    fn temp_path() -> std::path::PathBuf {
-        let n = COUNTER.fetch_add(1, Ordering::SeqCst);
-        std::env::temp_dir().join(format!("chosenone-settings-{}-{}.json", std::process::id(), n))
-    }
+    use crate::testutil::{temp_path, temp_write};
 
     #[test]
     fn missing_file_returns_default() {
-        let p = temp_path();
+        let p = temp_path("settings");
+        let _ = std::fs::remove_file(&p);
         let s = load_settings(&p);
         assert_eq!(s.theme, "dark");
         assert_eq!(s.scheme, "mist");
         assert_eq!(s.background, "");
-        let _ = fs::remove_file(&p);
+        let _ = std::fs::remove_file(&p);
     }
 
     #[test]
     fn corrupted_file_returns_default() {
-        let p = temp_path();
-        fs::write(&p, "not json{{{").unwrap();
+        let p = temp_write("settings", b"not json{{{");
         let s = load_settings(&p);
         assert_eq!(s.theme, "dark");
         assert_eq!(s.scheme, "mist");
-        let _ = fs::remove_file(&p);
+        let _ = std::fs::remove_file(&p);
     }
 
     #[test]
     fn roundtrip_saves_and_loads() {
-        let p = temp_path();
+        let p = temp_path("settings");
         let s = Settings {
             theme: "light".into(),
             scheme: "chalk".into(),
@@ -89,26 +87,33 @@ mod tests {
         assert_eq!(loaded.theme, "light");
         assert_eq!(loaded.scheme, "chalk");
         assert_eq!(loaded.background, "bg.png");
-        let _ = fs::remove_file(&p);
+        let _ = std::fs::remove_file(&p);
     }
 
     #[test]
     fn legacy_camel_case_is_readable() {
-        let p = temp_path();
-        // 兼容历史格式（无 scheme 字段）：theme 保留，scheme 归一化为 mist
-        fs::write(&p, r#"{"theme":"light","background":""}"#).unwrap();
+        let p = temp_write("settings", br#"{"theme":"light","background":""}"#);
         let loaded = load_settings(&p);
         assert_eq!(loaded.theme, "light");
         assert_eq!(loaded.scheme, "mist");
-        let _ = fs::remove_file(&p);
+        let _ = std::fs::remove_file(&p);
     }
 
     #[test]
     fn unknown_scheme_normalizes_to_mist() {
-        let p = temp_path();
-        fs::write(&p, r#"{"theme":"dark","scheme":"neon","background":""}"#).unwrap();
+        let p = temp_write("settings", br#"{"theme":"dark","scheme":"neon","background":""}"#);
         let loaded = load_settings(&p);
         assert_eq!(loaded.scheme, "mist");
-        let _ = fs::remove_file(&p);
+        let _ = std::fs::remove_file(&p);
+    }
+
+    #[test]
+    fn unknown_theme_normalizes_to_dark() {
+        let p = temp_write("settings", br#"{"theme":"neon","scheme":"chalk","background":""}"#);
+        let loaded = load_settings(&p);
+        assert_eq!(loaded.theme, "dark");
+        // theme 归一化不波及合法的 scheme
+        assert_eq!(loaded.scheme, "chalk");
+        let _ = std::fs::remove_file(&p);
     }
 }

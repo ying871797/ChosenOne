@@ -70,18 +70,23 @@
     // 启动名单文件监视
     watchRosterFiles: () => invoke("watch_roster_files"),
 
-    // 订阅名单变化事件，返回取消订阅函数
-    onRosterChanged: (handler) =>
-      Tauri.event.listen("roster-changed", (event) => {
+    // 订阅名单变化事件，返回取消订阅函数。
+    // ⚠️ 与 invoke 同理，事件监听也要兼容 v1 扁平 `__TAURI__.listen` 与
+    //    v2 分模块 `__TAURI__.event.listen`；用 call 绑定原持有者避免 this 丢失。
+    onRosterChanged: (handler) => {
+      const namespace = Tauri?.event || Tauri;
+      const listenFn = namespace?.listen || Tauri?.listen;
+      if (!listenFn) return () => {};
+      return listenFn.call(namespace, "roster-changed", (event) => {
         handler(event.payload);
-      }),
+      });
+    },
   };
 
   // 有 Tauri 全局 API 且能取到 invoke 时用真实实现，否则用 mock
   // ⚠️ Tauri v2 的全局命名空间是分模块的：invoke 在 `__TAURI__.core.invoke`，
   //    v1 是扁平的 `__TAURI__.invoke`。两版都兼容，避免永远走 mock。
   const invoke = Tauri?.core?.invoke ?? Tauri?.invoke;
-  const tauriListen = Tauri?.event?.listen ?? Tauri?.listen;
   window.ChosenAPI = invoke ? real : createMock();
   window.__IS_BROWSER_PREVIEW__ = !invoke;
 })();

@@ -1,6 +1,8 @@
 mod exclude;
 mod names;
 mod settings;
+#[cfg(test)]
+mod testutil;
 mod util;
 mod watcher;
 
@@ -133,11 +135,8 @@ pub fn run() {
         })
         .build(tauri::generate_context!())
         .expect("error while building tauri application")
-        .run(|app_handle, event| {
-            if let tauri::RunEvent::Ready = event {
-                // 窗口就绪后启动名单文件监视
-                let dir = app_dir(app_handle);
-                let _ = watcher::start_watcher(app_handle.clone(), dir);
-            }
+        .run(|_app_handle, _event| {
+            // 名单文件监视由前端 `watch_roster_files` 命令启动（main.js init 时调用），
+            // 此处不再重复启动：setup/Ready 与命令多处启动会经 app.manage 反复替换重建 watcher。
         });
 }

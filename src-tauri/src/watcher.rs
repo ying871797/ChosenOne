@@ -53,9 +53,19 @@ pub fn start_watcher(app: AppHandle, dir: PathBuf) -> notify::Result<()> {
     Ok(())
 }
 
-/// 判断事件是否与名单/排除名单文件相关：只关心 create/modify/remove/rename。
+/// 判断事件是否与名单/排除名单文件相关：
+/// 只关心 `names.txt` / `excluded.txt` 的 create/modify/remove/rename，
+/// 忽略 settings.json、背景图等无关文件的变化（避免每次保存都重解析并推送）。
 fn is_relevant(event: &notify::Event) -> bool {
     use notify::EventKind;
+
+    let hits_roster_file = event
+        .paths
+        .iter()
+        .any(|p| matches!(p.file_name().and_then(|n| n.to_str()), Some("names.txt" | "excluded.txt")));
+    if !hits_roster_file {
+        return false;
+    }
     matches!(
         event.kind,
         EventKind::Create(_) | EventKind::Modify(_) | EventKind::Remove(_)

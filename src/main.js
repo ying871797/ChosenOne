@@ -12,7 +12,6 @@
   let excluded = [];      // 排除名单
   let picked = new Set(); // 已点名（会话内存，重启即重置）
   let isDrawing = false;  // 正在滚动动画
-  let currentHit = null;  // 当前抽中者（用于命中高亮）
 
   // ---------- DOM ----------
   const slotList = document.getElementById("slotList");
@@ -56,16 +55,19 @@
   // ---------- 更新界面状态 ----------
   function refreshStatus() {
     const pool = getPool();
-    const total = allNames.length - excluded.length;
+    // 应点名总人数 = 名单数 − 命中名单中的排除数。
+    // excluded.txt 可能含名单外名字，直接用 excluded.length 会算小甚至为负。
+    const excludedInRoster = excluded.filter((n) => allNames.includes(n)).length;
+    const total = allNames.length - excludedInRoster;
     pickedCount.textContent = `已点名 ${picked.size}/${total}`;
-    excludedCount.textContent = `已排除 ${excluded.length}`;
+    excludedCount.textContent = `已排除 ${excludedInRoster}`;
 
     if (allNames.length === 0) {
       statusHint.textContent = "名单为空，请在应用目录创建 names.txt";
       drawBtn.disabled = true;
     } else if (pool.length === 0) {
       // 区分"全被排除/点名"与"无名单"
-      if (excluded.length >= allNames.length) {
+      if (excludedInRoster >= allNames.length) {
         statusHint.textContent = "所有人均在排除名单中，无可抽对象";
       } else {
         statusHint.textContent = "全部已点名，请点击重置";
@@ -148,7 +150,6 @@
   function rollTo(target) {
     return new Promise((resolve) => {
       isDrawing = true;
-      currentHit = null;
       refreshStatus();
 
       // 中部索引从 0 推进，最终停在 maxMid（= 序列长 − 3），
@@ -187,7 +188,6 @@
     renderFrame(seq, midIdx);
     const hitRow = rows[midIdx + CENTER];
     hitRow.classList.add("center", "hit");
-    currentHit = seq[midIdx + CENTER];
   }
 
   // ---------- 抽取入口 ----------
@@ -211,8 +211,9 @@
 
   // ---------- 重置 ----------
   function onReset() {
+    // 动画播放中忽略重置：避免动画结束后被 onDraw 收尾覆盖（picked 误加一人、状态被改写）
+    if (isDrawing) return;
     picked.clear();
-    currentHit = null;
     // 复位老虎机（中央行显示骰子）
     rows.forEach((row, i) => {
       row.classList.remove("center", "hit");

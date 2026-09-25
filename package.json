@@ -1,0 +1,12 @@
+{
+  "name": "chosenone",
+  "version": "0.1.0",
+  "description": "天选之子 — 桌面点名器",
+  "private": true,
+  "scripts": {
+    "tauri": "tauri"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2"
+  }
+}

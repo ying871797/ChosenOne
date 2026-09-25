@@ -70,10 +70,12 @@ Tauri 命令：
 
 | 命令 | 功能 | 说明 |
 |---|---|---|
-| `get_names()` | 读取并解析 `names.txt` | 返回名字数组；文件缺失时自动生成示例文件 |
-| `watch_names_file()` | 启动监视 | 用 Rust `notify` crate 监视文件变化（写入/重命名/删除），重新解析并通过 Tauri event `names-changed` 推送新名单到前端 |
+| `get_roster()` | 读取并解析 `names.txt` 与 `excluded.txt` | 返回 `{ names, excluded }`；`names.txt` 缺失时自动生成示例文件，`excluded.txt` 缺失视为无排除 |
+| `watch_roster_files()` | 启动监视 | 用 Rust `notify` crate 监视应用目录下名单文件（写入/重命名/删除），重新解析并通过 Tauri event `roster-changed` 推送 `{ names, excluded }` 到前端 |
 | `load_settings()` / `save_settings()` | 读写 `settings.json` | 启动时加载，改动时保存 |
-| `get_app_dir()` | 返回应用目录路径 | 用于打开目录按钮，定位名单文件和放置背景图 |
+| `get_app_dir()` | 返回应用目录路径 | 用于定位名单文件与放置背景图 |
+| `open_app_dir()` | 系统资源管理器打开应用目录 | Windows 用 `explorer`，无需额外插件 |
+| `read_background(filename)` | 读取应用目录下背景图片 | 返回 base64 data URL（内部手写 base64 编码，零额外依赖）；防路径穿越 |
 
 文件位置全部相对可执行文件所在目录，打包后与 exe 同级。
 

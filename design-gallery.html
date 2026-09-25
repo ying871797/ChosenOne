@@ -1,0 +1,899 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>天选之子 · 设计方案画廊</title>
+<style>
+/* ============================================================
+   画廊框架（与方案无关）
+   ============================================================ */
+:root {
+  --font-ui: "Segoe UI", "Microsoft YaHei", "PingFang SC", sans-serif;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100%; }
+body {
+  font-family: var(--font-ui);
+  background: #0e110d;
+  color: #dde4dd;
+  overflow: hidden;
+  user-select: none;
+}
+.gallery { display: flex; height: 100%; }
+
+/* ---------- 左栏：方案列表 ---------- */
+.scheme-list {
+  width: 286px; min-width: 286px;
+  overflow-y: auto;
+  padding: 20px 14px 24px;
+  background: #151a15;
+  border-right: 1px solid #262c24;
+  display: flex; flex-direction: column; gap: 10px;
+}
+.gallery-head { padding: 2px 6px 12px; }
+.gallery-head h1 { font-size: 18px; letter-spacing: 2px; color: #f0f4ee; }
+.gallery-head p { font-size: 12px; color: #8a948c; margin-top: 6px; line-height: 1.7; }
+.scheme-card {
+  padding: 12px 12px 11px;
+  border: 1px solid #262c24;
+  border-radius: 14px;
+  background: #1a201a;
+  cursor: pointer;
+  transition: transform .18s ease, border-color .2s ease, background .2s ease;
+}
+.scheme-card:hover { transform: translateY(-2px); border-color: #3d463c; background: #1e261e; }
+.scheme-card.active { border-color: #c9d6c4; background: #232b23; box-shadow: 0 0 0 1px #3a443a inset; }
+.card-top { display: flex; align-items: baseline; justify-content: space-between; gap: 6px; }
+.card-name { font-size: 15px; font-weight: 700; letter-spacing: 1px; color: #eef2ec; }
+.card-badge {
+  font-size: 10px; letter-spacing: 1px;
+  padding: 2px 7px; border-radius: 99px;
+  color: #d8e2d4; border: 1px solid #3d463c; white-space: nowrap;
+}
+.card-badge.shipped  { color: #ffe9b0; border-color: #6a5b2c; background: #2a2413; }
+.card-badge.proposal { color: #9fd8c0; border-color: #2f5444; background: #12251d; }
+.card-tag { font-size: 11px; color: #8a948c; margin-top: 5px; letter-spacing: .5px; }
+.swatches { display: flex; gap: 6px; margin-top: 9px; }
+.swatch { width: 15px; height: 15px; border-radius: 50%; border: 1px solid rgba(255,255,255,.22); }
+.swatch.wide { width: 26px; border-radius: 5px; }
+
+/* ---------- 右栏：预览 + 说明 ---------- */
+.preview {
+  flex: 1; min-width: 0;
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  gap: 20px; padding: 26px 30px;
+  overflow-y: auto;
+}
+.preview-stage {
+  width: min(680px, 100%);
+  animation: fadein .35s ease;
+}
+@keyframes fadein { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+
+/* ============================================================
+   点名器壳（变量驱动，与 src/index.html 同构；静态 3 行预览）
+   ============================================================ */
+.app-shell {
+  --bd: 18px;
+  position: relative;
+  width: 100%;
+  height: auto;
+  border-radius: calc(var(--bd) + 6px);
+  background: var(--bg-image);
+  background-size: cover;
+  background-position: center;
+  box-shadow: 0 24px 60px rgba(0,0,0,.45);
+  overflow: hidden;
+  transition: background .25s ease;
+}
+.app { position: relative; z-index: 1; display: flex; flex-direction: column; padding-bottom: 0; }
+
+/* 背景动效层：内容之下、指针穿透、不参与布局 */
+.bg-fx { position: absolute; inset: 0; overflow: hidden; pointer-events: none; z-index: 0; }
+.bg-fx .fx { position: absolute; }
+
+/* 顶栏 */
+.topbar { display: flex; justify-content: space-between; align-items: center; padding: 15px 24px 10px; }
+.title { display: flex; align-items: baseline; gap: 10px; min-width: 0; }
+.brand-leaf { width: 24px; height: 24px; color: var(--accent); align-self: center; opacity: .95; filter: drop-shadow(0 1px 2px rgba(0,0,0,.25)); }
+.title-text { font-family: var(--font-display); font-size: 24px; font-weight: 700; letter-spacing: 4px; color: var(--ink); text-shadow: var(--row-shadow); white-space: nowrap; }
+.title-sub { font-size: 11px; letter-spacing: 2px; color: var(--ink-faint); white-space: nowrap; }
+.toolbar { display: flex; gap: 10px; }
+.icon-btn {
+  width: 36px; height: 36px; border-radius: 50%;
+  border: 1.5px solid var(--ink-faint);
+  background: transparent; color: var(--ink);
+  display: grid; place-items: center; cursor: pointer;
+  transition: transform .18s ease, background .2s ease;
+}
+.icon-btn svg { width: 19px; height: 19px; }
+.icon-btn:hover { transform: translateY(-2px) rotate(-8deg); background: var(--accent-soft); }
+
+/* 舞台 */
+.stage { display: flex; flex-direction: column; align-items: center; padding: 4px 30px 6px; }
+
+/* 窗框：宽度显式给基准（防百分比解析塌缩，历史回归教训） */
+.slot-frame {
+  position: relative;
+  width: min(576px, 100%);
+  padding: 8px;
+  border-radius: var(--bd);
+  background: var(--frame-bg);
+  box-shadow:
+    0 0 0 1px var(--hairline),
+    0 2px 10px rgba(0,0,0,.22),
+    0 18px 44px rgba(0,0,0,.32),
+    var(--frame-glow),
+    inset 0 1px 0 rgba(255,255,255,.08);
+}
+.slot-viewport {
+  position: relative; width: 100%;
+  height: 240px; overflow: hidden;
+  border-radius: calc(var(--bd) - 4px);
+  background: linear-gradient(180deg, var(--fog-top), var(--fog-bottom));
+  box-shadow: inset 0 12px 28px rgba(0,0,0,.28), inset 0 0 0 1px rgba(255,255,255,.05);
+}
+.slot-body { position: absolute; inset: 0; }
+.slot-row {
+  height: 80px;
+  display: flex; align-items: center; justify-content: center;
+  font-family: var(--font-display);
+  font-size: 42px; font-weight: 700; letter-spacing: 3px;
+  color: var(--ink-dim);
+  white-space: nowrap; overflow: hidden;
+  text-shadow: var(--row-shadow);
+}
+.slot-row.center {
+  color: var(--accent);
+  font-size: 46px;
+  text-shadow: 0 0 26px var(--accent-soft);
+}
+.slot-mask { position: absolute; left: 0; right: 0; height: 44px; pointer-events: none; }
+.top-mask { top: 0; background: linear-gradient(to bottom, var(--fog-top) 30%, transparent); }
+.bottom-mask { bottom: 0; background: linear-gradient(to top, var(--fog-bottom) 30%, transparent); }
+.status-hint { margin-top: 11px; font-family: var(--font-display); font-size: 14px; letter-spacing: 1px; color: var(--ink-dim); text-align: center; }
+
+/* 控制区（三栏对称：状态｜中央抽取按钮｜状态） */
+.controls { margin-top: 9px; padding: 15px 24px 17px; display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 18px; background: var(--controls-bg); border-top: 1px dashed var(--hairline); }
+.side-stats { display: flex; align-items: center; font-size: 12px; letter-spacing: .5px; color: var(--ink-dim); white-space: nowrap; }
+.side-left { justify-content: flex-start; }
+.side-right { justify-content: flex-end; gap: 14px; }
+.draw-btn {
+  position: relative; width: 164px; padding: 13px 0 13px 13px;
+  font-family: var(--font-display);
+  font-size: 20px; font-weight: 700; letter-spacing: 13px;
+  color: var(--btn-ink);
+  background: var(--draw-bg);
+  border: none; border-radius: calc(var(--bd) - 4px);
+  cursor: pointer;
+  box-shadow: 0 4px 0 rgba(0,0,0,.2), 0 12px 24px rgba(0,0,0,.26);
+  transition: transform .15s ease, box-shadow .2s ease, filter .2s ease;
+}
+.draw-btn:hover { transform: translateY(-3px); box-shadow: 0 7px 0 rgba(0,0,0,.16), 0 20px 30px rgba(0,0,0,.26); filter: brightness(1.06); }
+.draw-btn::after {
+  content: ""; position: absolute; left: 15px; top: 50%;
+  width: 4px; height: 4px; border-radius: 50%;
+  background: var(--btn-ink); opacity: .5;
+  box-shadow: 0 9px 0 var(--btn-ink), 0 18px 0 var(--btn-ink);
+}
+.reset-btn { padding: 5px 13px; border: 1px solid var(--ink-faint); border-radius: 9px; background: transparent; color: var(--ink-dim); cursor: pointer; font-size: 12px; letter-spacing: 1px; }
+
+/* ---------- 背景动效（克制层：低透明 / 慢速 / 不触交互） ---------- */
+/* 纪律：元素≤8、透明度≤.7、周期≥8s、中央视口区留空、pointer-events:none、reduced-motion 降级 */
+
+/* 萤火秘境：金色小灯巡游 */
+[data-scheme="firefly"] .fx.dot {
+  width: 5px; height: 5px; border-radius: 50%;
+  background: #ffd98a;
+  box-shadow: 0 0 14px 4px rgba(255, 217, 138, .6);
+  opacity: .28;
+  animation: fx-firefly 10s ease-in-out infinite alternate;
+}
+[data-scheme="firefly"] .fx.dot:nth-of-type(1) { left: 10%; top: 26%; animation-duration: 9.5s;  animation-delay: -1.2s; }
+[data-scheme="firefly"] .fx.dot:nth-of-type(2) { left: 24%; top: 62%; animation-duration: 12s;   animation-delay: -4.4s; }
+[data-scheme="firefly"] .fx.dot:nth-of-type(3) { left: 46%; top: 16%; animation-duration: 10.5s; animation-delay: -2.8s; }
+[data-scheme="firefly"] .fx.dot:nth-of-type(4) { left: 64%; top: 48%; animation-duration: 13.5s; animation-delay: -6.2s; }
+[data-scheme="firefly"] .fx.dot:nth-of-type(5) { left: 80%; top: 22%; animation-duration: 11s;   animation-delay: -3.5s; }
+[data-scheme="firefly"] .fx.dot:nth-of-type(6) { left: 92%; top: 64%; animation-duration: 14s;   animation-delay: -7.7s; }
+@keyframes fx-firefly {
+  0%   { transform: translate(0, 0) scale(1); opacity: .22; }
+  50%  { transform: translate(22px, -34px) scale(1.3); opacity: .85; }
+  100% { transform: translate(-16px, -6px) scale(.85); opacity: .3; }
+}
+
+/* 樱瓣微风：水彩花瓣旋转飘落 */
+[data-scheme="sakura"] .fx.petal {
+  top: -20px;
+  width: 12px; height: 10px;
+  background: linear-gradient(135deg, #f8b9cb, #ef9ab3);
+  border-radius: 100% 4px 100% 4px;
+  opacity: 0;
+  animation: fx-sakura 9s linear infinite;
+}
+[data-scheme="sakura"] .fx.petal:nth-of-type(1) { left: 4%;  --sway: 26px;  animation-duration: 8.2s;  animation-delay: -1s; }
+[data-scheme="sakura"] .fx.petal:nth-of-type(2) { left: 13%; --sway: -20px; animation-duration: 10.5s; animation-delay: -3.4s; }
+[data-scheme="sakura"] .fx.petal:nth-of-type(3) { left: 24%; --sway: 34px;  animation-duration: 9.1s;  animation-delay: -5.8s; }
+[data-scheme="sakura"] .fx.petal:nth-of-type(4) { left: 38%; --sway: -28px; animation-duration: 11.6s; animation-delay: -2.2s; }
+[data-scheme="sakura"] .fx.petal:nth-of-type(5) { left: 52%; --sway: 22px;  animation-duration: 8.8s;  animation-delay: -6.9s; }
+[data-scheme="sakura"] .fx.petal:nth-of-type(6) { left: 66%; --sway: -32px; animation-duration: 10.2s; animation-delay: -4.6s; }
+[data-scheme="sakura"] .fx.petal:nth-of-type(7) { left: 80%; --sway: 24px;  animation-duration: 9.6s;  animation-delay: -0.9s; }
+[data-scheme="sakura"] .fx.petal:nth-of-type(8) { left: 91%; --sway: -18px; animation-duration: 11.1s; animation-delay: -7.4s; }
+@keyframes fx-sakura {
+  0%   { transform: translate3d(0, 0, 0) rotate(0deg); opacity: 0; }
+  8%   { opacity: .88; }
+  85%  { opacity: .78; }
+  100% { transform: translate3d(var(--sway), 560px, 0) rotate(320deg); opacity: 0; }
+}
+
+/* 纸鸢青空：纸鸢剪影摆动 + 棉云横移 */
+[data-scheme="kite"] .fx.kite {
+  width: 16px; height: 16px;
+  background: linear-gradient(135deg, #e2543a 0 45%, #f7c9b8 45% 55%, #e2543a 55% 100%);
+  clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%);
+  opacity: .65;
+  animation: fx-kite 11s ease-in-out infinite alternate;
+}
+[data-scheme="kite"] .fx.kite::after {
+  content: ""; position: absolute; left: 6px; top: 13px;
+  width: 1px; height: 32px;
+  background: linear-gradient(to bottom, rgba(201, 63, 39, .9), transparent);
+  box-shadow: 4px 4px 0 -0.5px rgba(201, 63, 39, .9), -3px 8px 0 -0.5px rgba(201, 63, 39, .9);
+}
+[data-scheme="kite"] .fx.kite:nth-of-type(1) { left: 13%; top: 8%;  animation-duration: 10s; }
+[data-scheme="kite"] .fx.kite:nth-of-type(2) { left: 72%; top: 14%; animation-duration: 13s; animation-delay: -4s; }
+@keyframes fx-kite {
+  0%   { transform: translate(0, 0) rotate(-4deg); }
+  50%  { transform: translate(34px, -20px) rotate(3deg); }
+  100% { transform: translate(-8px, 14px) rotate(-4deg); }
+}
+[data-scheme="kite"] .fx.cloud {
+  top: 16%; left: -90px;
+  width: 84px; height: 24px;
+  background: #ffffff;
+  border-radius: 20px;
+  opacity: .55;
+  animation: fx-cloud 40s linear infinite;
+}
+[data-scheme="kite"] .fx.cloud::before {
+  content: ""; position: absolute; left: 16px; top: -14px;
+  width: 26px; height: 26px; border-radius: 50%; background: #fff;
+}
+[data-scheme="kite"] .fx.cloud::after {
+  content: ""; position: absolute; left: 38px; top: -9px;
+  width: 18px; height: 18px; border-radius: 50%; background: #fff;
+}
+[data-scheme="kite"] .fx.cloud:nth-of-type(3) { top: 8%;  animation-duration: 34s; animation-delay: -12s; }
+[data-scheme="kite"] .fx.cloud:nth-of-type(4) { top: 22%; animation-duration: 46s; animation-delay: -27s; }
+[data-scheme="kite"] .fx.cloud:nth-of-type(5) { top: 5%;  animation-duration: 38s; animation-delay: -5s; }
+@keyframes fx-cloud { from { transform: translateX(0); } to { transform: translateX(calc(100vw + 90px)); } }
+
+/* 星河流转：星光眨眼 + 流星偶划过 */
+[data-scheme="star"] .fx.star {
+  width: 2px; height: 2px; border-radius: 50%;
+  background: #ffffff;
+  box-shadow: 0 0 4px 1px rgba(255, 255, 255, .35);
+  opacity: .2;
+  animation: fx-twinkle 3.4s ease-in-out infinite alternate;
+}
+[data-scheme="star"] .fx.star:nth-of-type(1) { left: 6%;  top: 20%; animation-duration: 2.6s; animation-delay: -0.4s; }
+[data-scheme="star"] .fx.star:nth-of-type(2) { left: 18%; top: 10%; animation-duration: 3.8s; animation-delay: -1.8s; }
+[data-scheme="star"] .fx.star:nth-of-type(3) { left: 33%; top: 26%; animation-duration: 3.1s; animation-delay: -2.4s; }
+[data-scheme="star"] .fx.star:nth-of-type(4) { left: 52%; top: 12%; animation-duration: 4.4s; animation-delay: -0.9s; }
+[data-scheme="star"] .fx.star:nth-of-type(5) { left: 66%; top: 24%; animation-duration: 2.9s; animation-delay: -3.1s; }
+[data-scheme="star"] .fx.star:nth-of-type(6) { left: 80%; top: 9%;  animation-duration: 4.1s; animation-delay: -1.3s; }
+[data-scheme="star"] .fx.star:nth-of-type(7) { left: 90%; top: 22%; animation-duration: 3.5s; animation-delay: -2.7s; }
+[data-scheme="star"] .fx.star:nth-of-type(8) { left: 43%; top: 40%; animation-duration: 3.3s; animation-delay: -0.2s; }
+@keyframes fx-twinkle { from { opacity: .3; } to { opacity: .95; } }
+[data-scheme="star"] .fx.meteor {
+  top: -6px; right: -30px;
+  width: 74px; height: 1.6px;
+  background: linear-gradient(90deg, rgba(255, 217, 138, 0), rgba(255, 255, 255, .9) 70%, #fff);
+  border-radius: 2px;
+  transform: rotate(-28deg);
+  opacity: 0;
+  animation: fx-meteor 6.5s linear infinite;
+}
+[data-scheme="star"] .fx.meteor:nth-of-type(9) { animation-delay: -1.7s; }
+[data-scheme="star"] .fx.meteor:nth-of-type(10) { top: -14px; right: -8px; animation-duration: 7.8s; animation-delay: -4.1s; }
+@keyframes fx-meteor {
+  0%   { transform: translate(0, 0) rotate(-28deg); opacity: 0; }
+  4%   { opacity: 1; }
+  13%  { transform: translate(-300px, 170px) rotate(-28deg); opacity: 0; }
+  100% { transform: translate(-300px, 170px) rotate(-28deg); opacity: 0; }
+}
+
+/* 涟漪荷塘：细涟漪扩散 + 荷叶轻摆 */
+[data-scheme="ripple"] .fx.ring {
+  width: 76px; height: 76px;
+  border: 1.2px solid rgba(255, 255, 255, .34);
+  border-radius: 50%;
+  opacity: 0;
+  animation: fx-ripple 8s ease-out infinite;
+}
+[data-scheme="ripple"] .fx.ring:nth-of-type(1) { left: 12%; top: 64%; animation-duration: 7s;  animation-delay: -1.2s; }
+[data-scheme="ripple"] .fx.ring:nth-of-type(2) { left: 38%; top: 78%; animation-duration: 9s;  animation-delay: -4.6s; }
+[data-scheme="ripple"] .fx.ring:nth-of-type(3) { left: 62%; top: 66%; animation-duration: 8s;  animation-delay: -2.8s; }
+[data-scheme="ripple"] .fx.ring:nth-of-type(4) { left: 88%; top: 82%; animation-duration: 11s; animation-delay: -6.4s; }
+@keyframes fx-ripple { 0% { transform: scale(.3); opacity: .75; } 100% { transform: scale(2); opacity: 0; } }
+[data-scheme="ripple"] .fx.leaf {
+  left: 7%; bottom: 5%;
+  width: 54px; height: 45px;
+  background: radial-gradient(ellipse at 35% 40%, #3f7a5c, #2b5c45);
+  border-radius: 58% 42% 55% 45% / 52% 48% 52% 48%;
+  opacity: .52;
+  animation: fx-leaf 7s ease-in-out infinite alternate;
+}
+@keyframes fx-leaf { from { transform: rotate(-5deg); } to { transform: rotate(5deg); } }
+
+/* 无障碍：系统偏好减少动效时，静止呈现（保留一丝氛围） */
+@media (prefers-reduced-motion: reduce) {
+  .bg-fx .fx { animation: none !important; opacity: .1; }
+}
+
+/* ---------- 设计说明卡 ---------- */
+.notes {
+  width: min(680px, 100%);
+  padding: 14px 20px;
+  border: 1px solid #2a3028;
+  border-radius: 14px;
+  background: #171c17;
+}
+.notes-name { font-size: 15px; font-weight: 700; color: #f0f4ee; letter-spacing: 1px; }
+.notes-name .pos { font-size: 11px; color: #9aa49a; font-weight: 400; margin-left: 8px; letter-spacing: .5px; }
+.notes-desc { font-size: 13px; color: #b8c2b8; line-height: 1.8; margin-top: 8px; }
+.notes-keys { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+.key { font-size: 11px; padding: 3px 9px; border-radius: 99px; border: 1px solid #34402f; color: #9fd8c0; background: #12251d; letter-spacing: .5px; }
+.footnote { font-size: 11px; color: #6d766d; margin-top: 6px; letter-spacing: .3px; }
+
+::-webkit-scrollbar { width: 8px; }
+::-webkit-scrollbar-thumb { background: #2c332b; border-radius: 4px; }
+
+/* ============================================================
+   13 套方案主题（全部变量驱动，9-13 带背景动效）
+   ============================================================ */
+
+/* ---------- 1 晨雾林窗（现役） ---------- */
+[data-scheme="mist"] {
+  --font-display: "楷体", "KaiTi", "STKaiti", "Microsoft YaHei", sans-serif;
+  --bd: 18px;
+  --bg: #1c2620; --bg-deep: #141c17; --bg-edge: #0f1611;
+  --fog-top: #2a3b31; --fog-bottom: #1f2e26;
+  --panel: #24332b; --panel-2: #2c3e33; --panel-3: #33483a;
+  --ink: #e7efdc; --ink-dim: rgba(231,239,220,.58); --ink-faint: rgba(231,239,220,.24);
+  --accent: #e9d48b; --accent-2: #d8bd6b; --accent-soft: rgba(233,212,139,.15);
+  --leaf: #b6c98a; --danger: #e08f7a; --btn-ink: #24200f;
+  --hairline: rgba(231,239,220,.14); --row-shadow: 0 1px 2px rgba(0,0,0,.28);
+  --frame-bg: linear-gradient(160deg, #2a3b31, #1f2e26);
+  --frame-glow: transparent;
+  --controls-bg: linear-gradient(180deg, rgba(255,255,255,.03), rgba(0,0,0,.05));
+  --draw-bg: linear-gradient(135deg, #e9d48b, #d8bd6b);
+  --bg-image:
+    radial-gradient(120% 90% at 16% 4%, rgba(233,212,139,.10), transparent 58%),
+    radial-gradient(110% 85% at 88% 92%, rgba(182,201,138,.08), transparent 55%),
+    linear-gradient(168deg, #141c17, #1c2620 55%, #0f1611);
+}
+
+/* ---------- 2 绿板粉笔 · 木质课堂（备存） ---------- */
+[data-scheme="chalk"] {
+  --font-display: "楷体", "KaiTi", "STKaiti", "Microsoft YaHei", sans-serif;
+  --bd: 20px;
+  --bg: #22352b; --bg-deep: #16251d; --bg-edge: #0f1c15;
+  --fog-top: #283d31; --fog-bottom: #1c2d24;
+  --panel: #24382e; --panel-2: #2b4034; --panel-3: #33493b;
+  --ink: #f3efe2; --ink-dim: rgba(243,239,226,.58); --ink-faint: rgba(243,239,226,.24);
+  --accent: #ffd95e; --accent-2: #e2b941; --accent-soft: rgba(255,217,94,.16);
+  --leaf: #a8c6ff; --danger: #ff8a7a; --btn-ink: #2a1f08;
+  --hairline: rgba(243,239,226,.18); --row-shadow: 0 1px 2px rgba(0,0,0,.3);
+  --frame-bg: linear-gradient(115deg, #9a6739, #7c4e27 38%, #8a5a31 62%, #5f3b1d);
+  --frame-glow: 0 0 0 4px rgba(243,239,226,.10);
+  --controls-bg: linear-gradient(115deg, #9a6739, #7c4e27 38%, #8a5a31 62%, #5f3b1d);
+  --draw-bg: linear-gradient(180deg, #6f4728, #54351d);
+  --bg-image:
+    linear-gradient(168deg, #16251d, #22352b 55%, #0f1c15);
+}
+
+/* ---------- 3 纸灯笼 · 暖巷（新） ---------- */
+[data-scheme="lantern"] {
+  --font-display: "楷体", "KaiTi", "STKaiti", "Microsoft YaHei", sans-serif;
+  --bd: 18px;
+  --bg: #2c1710; --bg-deep: #200f09; --bg-edge: #160a05;
+  --fog-top: #5a2c16; --fog-bottom: #3e1c0d;
+  --panel: #4a2413; --panel-2: #5a2d18; --panel-3: #6a3a1e;
+  --ink: #f9e6c8; --ink-dim: rgba(249,230,200,.62); --ink-faint: rgba(249,230,200,.26);
+  --accent: #ffb060; --accent-2: #e08a3c; --accent-soft: rgba(255,176,96,.16);
+  --leaf: #f4cf9b; --danger: #ff8a6a; --btn-ink: #2a1206;
+  --hairline: rgba(249,230,200,.16); --row-shadow: 0 1px 2px rgba(0,0,0,.32);
+  --frame-bg: linear-gradient(160deg, #5a2c16, #3e1c0d);
+  --frame-glow: 0 0 30px rgba(255,176,96,.16);
+  --controls-bg: linear-gradient(180deg, rgba(255,176,96,.05), rgba(0,0,0,.14));
+  --draw-bg: linear-gradient(135deg, #ffb060, #e08a3c);
+  --bg-image:
+    radial-gradient(90% 70% at 50% 8%, rgba(255,176,96,.13), transparent 60%),
+    radial-gradient(80% 60% at 12% 96%, rgba(212,84,40,.10), transparent 55%),
+    linear-gradient(168deg, #200f09, #2c1710 55%, #160a05);
+}
+
+/* ---------- 4 星夜营地（新） ---------- */
+[data-scheme="starlit"] {
+  --font-display: "楷体", "KaiTi", "STKaiti", "Microsoft YaHei", sans-serif;
+  --bd: 18px;
+  --bg: #0f1b30; --bg-deep: #0a1322; --bg-edge: #060c18;
+  --fog-top: #1b2b4d; --fog-bottom: #121f3a;
+  --panel: #16263f; --panel-2: #1e3050; --panel-3: #274163;
+  --ink: #e9eef8; --ink-dim: rgba(233,238,248,.6); --ink-faint: rgba(233,238,248,.24);
+  --accent: #ffb36b; --accent-2: #e08a45; --accent-soft: rgba(255,179,107,.16);
+  --leaf: #c7d3ff; --danger: #ff8f7a; --btn-ink: #241303;
+  --hairline: rgba(233,238,248,.15); --row-shadow: 0 1px 2px rgba(0,0,0,.35);
+  --frame-bg: linear-gradient(160deg, #1b2b4d, #121f3a);
+  --frame-glow: 0 0 26px rgba(255,179,107,.12);
+  --controls-bg: linear-gradient(180deg, rgba(128,160,255,.05), rgba(0,0,0,.16));
+  --draw-bg: linear-gradient(135deg, #ffb36b, #e08a45);
+  --bg-image:
+    radial-gradient(1.6px 1.6px at 14% 18%, rgba(255,255,255,.9), transparent 60%),
+    radial-gradient(1.4px 1.4px at 32% 9%, rgba(255,255,255,.75), transparent 60%),
+    radial-gradient(1.8px 1.8px at 55% 22%, rgba(255,255,255,.85), transparent 60%),
+    radial-gradient(1.3px 1.3px at 74% 12%, rgba(255,255,255,.7), transparent 60%),
+    radial-gradient(1.7px 1.7px at 88% 26%, rgba(255,255,255,.8), transparent 60%),
+    radial-gradient(1.4px 1.4px at 8% 62%, rgba(255,255,255,.6), transparent 60%),
+    radial-gradient(80% 50% at 85% 100%, rgba(255,179,107,.10), transparent 60%),
+    linear-gradient(168deg, #0a1322, #0f1b30 55%, #060c18);
+}
+
+/* ---------- 5 水墨竹影（新） ---------- */
+[data-scheme="ink"] {
+  --font-display: "楷体", "KaiTi", "STKaiti", "Microsoft YaHei", serif;
+  --bd: 15px;
+  --bg: #f2ede0; --bg-deep: #e9e2d0; --bg-edge: #ddd3ba;
+  --fog-top: #fbf7ec; --fog-bottom: #f1ebd9;
+  --panel: #f7f2e4; --panel-2: #ede5d0; --panel-3: #e2d8bf;
+  --ink: #33302a; --ink-dim: rgba(51,48,42,.66); --ink-faint: rgba(51,48,42,.3);
+  --accent: #b43a2a; --accent-2: #8e2c1f; --accent-soft: rgba(180,58,42,.12);
+  --leaf: #5f7b5a; --danger: #a33b2b; --btn-ink: #f7f1e0;
+  --hairline: rgba(51,48,42,.16); --row-shadow: none;
+  --frame-bg: linear-gradient(160deg, #fbf7ec, #f1ebd9);
+  --frame-glow: 0 0 0 2px rgba(180,58,42,.10);
+  --controls-bg: linear-gradient(180deg, rgba(0,0,0,.02), rgba(0,0,0,.05));
+  --draw-bg: linear-gradient(135deg, #b43a2a, #8e2c1f);
+  --bg-image:
+    radial-gradient(70% 55% at 30% 20%, rgba(51,48,42,.05), transparent 60%),
+    radial-gradient(60% 45% at 75% 75%, rgba(95,123,90,.06), transparent 55%),
+    linear-gradient(168deg, #e9e2d0, #f2ede0 55%, #ddd3ba);
+}
+
+/* ---------- 6 糖果游园（新） ---------- */
+[data-scheme="candy"] {
+  --font-display: "楷体", "KaiTi", "STKaiti", "Microsoft YaHei", sans-serif;
+  --bd: 22px;
+  --bg: #fdf3e7; --bg-deep: #fbe8d8; --bg-edge: #f2dcc6;
+  --fog-top: #fffaf0; --fog-bottom: #fdeee1;
+  --panel: #fff7ec; --panel-2: #fbe7da; --panel-3: #f6d9c8;
+  --ink: #76534a; --ink-dim: rgba(118,83,74,.66); --ink-faint: rgba(118,83,74,.3);
+  --accent: #ff7296; --accent-2: #f2557d; --accent-soft: rgba(255,114,150,.14);
+  --leaf: #8fd3b4; --danger: #e05f5f; --btn-ink: #ffffff;
+  --hairline: rgba(118,83,74,.14); --row-shadow: none;
+  --frame-bg: linear-gradient(160deg, #fffaf0, #fdeee1);
+  --frame-glow: 0 0 24px rgba(255,114,150,.12);
+  --controls-bg: linear-gradient(180deg, rgba(255,255,255,.45), rgba(255,114,150,.06));
+  --draw-bg: linear-gradient(135deg, #ff7296, #f2557d);
+  --bg-image:
+    radial-gradient(12px 12px at 18% 24%, rgba(255,255,255,.8), transparent 60%),
+    radial-gradient(8px 8px at 68% 14%, rgba(143,211,180,.5), transparent 60%),
+    radial-gradient(10px 10px at 84% 58%, rgba(255,255,255,.65), transparent 60%),
+    radial-gradient(7px 7px at 32% 78%, rgba(255,180,120,.45), transparent 60%),
+    linear-gradient(168deg, #fbe8d8, #fdf3e7 55%, #f2dcc6);
+}
+
+/* ---------- 7 霓虹夜航（新） ---------- */
+[data-scheme="neon"] {
+  --font-display: "Segoe UI", "Microsoft YaHei", "PingFang SC", sans-serif;
+  --bd: 16px;
+  --bg: #0d1020; --bg-deep: #080a16; --bg-edge: #04050d;
+  --fog-top: #161b33; --fog-bottom: #0f1326;
+  --panel: #12162c; --panel-2: #1a1f3d; --panel-3: #232a50;
+  --ink: #dce8ff; --ink-dim: rgba(220,232,255,.62); --ink-faint: rgba(220,232,255,.26);
+  --accent: #2ff3e8; --accent-2: #1bbfb6; --accent-soft: rgba(47,243,232,.14);
+  --leaf: #ff4fd8; --danger: #ff5f7a; --btn-ink: #041210;
+  --hairline: rgba(220,232,255,.15);
+  --row-shadow: 0 0 14px rgba(47,243,232,.16);
+  --frame-bg: linear-gradient(160deg, #161b33, #0f1326);
+  --frame-glow: 0 0 16px rgba(47,243,232,.18), 0 0 44px rgba(123,92,255,.12);
+  --controls-bg: linear-gradient(180deg, rgba(123,92,255,.08), rgba(0,0,0,.18));
+  --draw-bg: linear-gradient(135deg, #2ff3e8, #1bbfb6);
+  --bg-image:
+    repeating-linear-gradient(0deg, rgba(47,243,232,.045) 0 1px, transparent 1px 36px),
+    repeating-linear-gradient(90deg, rgba(123,92,255,.045) 0 1px, transparent 1px 36px),
+    radial-gradient(80% 60% at 80% 8%, rgba(255,79,216,.08), transparent 55%),
+    linear-gradient(168deg, #080a16, #0d1020 55%, #04050d);
+}
+
+/* ---------- 8 极光极夜（新） ---------- */
+[data-scheme="aurora"] {
+  --font-display: "楷体", "KaiTi", "STKaiti", "Microsoft YaHei", sans-serif;
+  --bd: 18px;
+  --bg: #081820; --bg-deep: #051018; --bg-edge: #03090e;
+  --fog-top: #0f2634; --fog-bottom: #0a1a26;
+  --panel: #0d1f2c; --panel-2: #142b3c; --panel-3: #1b3a4e;
+  --ink: #dff3ee; --ink-dim: rgba(223,243,238,.6); --ink-faint: rgba(223,243,238,.24);
+  --accent: #6ff3ce; --accent-2: #41cfa6; --accent-soft: rgba(111,243,206,.14);
+  --leaf: #a58cff; --danger: #ff8fa3; --btn-ink: #03201a;
+  --hairline: rgba(223,243,238,.15); --row-shadow: 0 1px 2px rgba(0,0,0,.35);
+  --frame-bg: linear-gradient(160deg, #0f2634, #0a1a26);
+  --frame-glow: 0 0 28px rgba(111,243,206,.14);
+  --controls-bg: linear-gradient(180deg, rgba(165,140,255,.06), rgba(0,0,0,.16));
+  --draw-bg: linear-gradient(135deg, #6ff3ce, #41cfa6);
+  --bg-image:
+    radial-gradient(120% 34% at 50% -6%, rgba(111,243,206,.20), transparent 70%),
+    radial-gradient(100% 30% at 30% 4%, rgba(165,140,255,.16), transparent 70%),
+    radial-gradient(1.4px 1.4px at 24% 32%, rgba(255,255,255,.55), transparent 60%),
+    radial-gradient(1.3px 1.3px at 62% 26%, rgba(255,255,255,.45), transparent 60%),
+    radial-gradient(1.6px 1.6px at 81% 44%, rgba(255,255,255,.5), transparent 60%),
+    linear-gradient(168deg, #051018, #081820 55%, #03090e);
+}
+
+/* ============================================================
+   9-13 背景动效方案（变量驱动 + .bg-fx 层动画，元素低透明慢速不抢戏）
+   ============================================================ */
+
+/* ---------- 9 萤火秘境（背景动画：萤火巡游） ---------- */
+[data-scheme="firefly"] {
+  --font-display: "楷体", "KaiTi", "STKaiti", "Microsoft YaHei", sans-serif;
+  --bd: 18px;
+  --bg: #0d1712; --bg-deep: #091009; --bg-edge: #050b07;
+  --fog-top: #12221a; --fog-bottom: #0c1812;
+  --panel: #0f1d16; --panel-2: #172a20; --panel-3: #1f3729;
+  --ink: #e4eedf; --ink-dim: rgba(228,238,223,.6); --ink-faint: rgba(228,238,223,.24);
+  --accent: #ffd98a; --accent-2: #e7b55e; --accent-soft: rgba(255,217,138,.15);
+  --leaf: #9fd4a8; --danger: #ff9a7d; --btn-ink: #241a05;
+  --hairline: rgba(228,238,223,.14); --row-shadow: 0 1px 2px rgba(0,0,0,.35);
+  --frame-bg: linear-gradient(160deg, #12221a, #0c1812);
+  --frame-glow: 0 0 26px rgba(255,217,138,.12);
+  --controls-bg: linear-gradient(180deg, rgba(255,217,138,.04), rgba(0,0,0,.14));
+  --draw-bg: linear-gradient(135deg, #ffd98a, #e7b55e);
+  --bg-image:
+    radial-gradient(120% 80% at 15% 2%, rgba(255,217,138,.07), transparent 55%),
+    radial-gradient(1.5px 1.5px at 30% 18%, rgba(255,255,255,.14), transparent 60%),
+    radial-gradient(1.3px 1.3px at 70% 34%, rgba(255,255,255,.1), transparent 60%),
+    linear-gradient(170deg, #091009, #0d1712 55%, #050b07);
+}
+
+/* ---------- 10 樱瓣微风（背景动画：樱瓣飘落） ---------- */
+[data-scheme="sakura"] {
+  --font-display: "楷体", "KaiTi", "STKaiti", "Microsoft YaHei", sans-serif;
+  --bd: 18px;
+  --bg: #fbeef0; --bg-deep: #f6e3e7; --bg-edge: #eccfd7;
+  --fog-top: #fdf5f4; --fog-bottom: #f8e9ec;
+  --panel: #fdf3f2; --panel-2: #f7e4e7; --panel-3: #f0d6db;
+  --ink: #5d3a44; --ink-dim: rgba(93,58,68,.64); --ink-faint: rgba(93,58,68,.3);
+  --accent: #e0709b; --accent-2: #cf5a88; --accent-soft: rgba(224,112,155,.13);
+  --leaf: #7fbfa0; --danger: #d9576f; --btn-ink: #ffffff;
+  --hairline: rgba(93,58,68,.14); --row-shadow: none;
+  --frame-bg: linear-gradient(160deg, #fdf5f4, #f8e9ec);
+  --frame-glow: 0 0 24px rgba(224,112,155,.1);
+  --controls-bg: linear-gradient(180deg, rgba(255,255,255,.5), rgba(224,112,155,.05));
+  --draw-bg: linear-gradient(135deg, #e0709b, #cf5a88);
+  --bg-image:
+    radial-gradient(130% 84% at 84% 8%, rgba(240,182,203,.28), transparent 58%),
+    radial-gradient(120% 80% at 10% 94%, rgba(255,255,255,.6), transparent 60%),
+    linear-gradient(170deg, #f6e3e7, #fbeef0 55%, #fdf3f4);
+}
+
+/* ---------- 11 纸鸢青空（背景动画：纸鸢与云） ---------- */
+[data-scheme="kite"] {
+  --font-display: "楷体", "KaiTi", "STKaiti", "Microsoft YaHei", sans-serif;
+  --bd: 18px;
+  --bg: #dcecf8; --bg-deep: #d2e5f3; --bg-edge: #c2d9ea;
+  --fog-top: #f0f8fc; --fog-bottom: #e2eff7;
+  --panel: #eef6fa; --panel-2: #e2edf4; --panel-3: #d3e3ee;
+  --ink: #2e4a63; --ink-dim: rgba(46,74,99,.64); --ink-faint: rgba(46,74,99,.3);
+  --accent: #e2543a; --accent-2: #c93f27; --accent-soft: rgba(226,84,58,.12);
+  --leaf: #4e9a5a; --danger: #d8492f; --btn-ink: #ffffff;
+  --hairline: rgba(46,74,99,.14); --row-shadow: none;
+  --frame-bg: linear-gradient(160deg, #f0f8fc, #e2eff7);
+  --frame-glow: 0 0 24px rgba(46,74,99,.08);
+  --controls-bg: linear-gradient(180deg, rgba(255,255,255,.55), rgba(46,74,99,.05));
+  --draw-bg: linear-gradient(135deg, #e2543a, #c93f27);
+  --bg-image:
+    radial-gradient(120% 90% at 30% 6%, rgba(255,255,255,.85), transparent 55%),
+    radial-gradient(110% 80% at 90% 98%, rgba(105,178,120,.14), transparent 55%),
+    linear-gradient(170deg, #d2e5f3, #dcecf8 55%, #d3e6f5);
+}
+
+/* ---------- 12 星河流转（背景动画：流星与星） ---------- */
+[data-scheme="star"] {
+  --font-display: "楷体", "KaiTi", "STKaiti", "Microsoft YaHei", sans-serif;
+  --bd: 18px;
+  --bg: #0a1224; --bg-deep: #060c1a; --bg-edge: #03070f;
+  --fog-top: #101c33; --fog-bottom: #0b1526;
+  --panel: #0d1729; --panel-2: #15213a; --panel-3: #1d2c4d;
+  --ink: #e4ecff; --ink-dim: rgba(228,236,255,.6); --ink-faint: rgba(228,236,255,.24);
+  --accent: #ffd98a; --accent-2: #e6b961; --accent-soft: rgba(255,217,138,.14);
+  --leaf: #9db8ff; --danger: #ff8fa3; --btn-ink: #241a05;
+  --hairline: rgba(228,236,255,.14); --row-shadow: 0 1px 2px rgba(0,0,0,.35);
+  --frame-bg: linear-gradient(160deg, #101c33, #0b1526);
+  --frame-glow: 0 0 24px rgba(157,184,255,.12);
+  --controls-bg: linear-gradient(180deg, rgba(157,184,255,.05), rgba(0,0,0,.18));
+  --draw-bg: linear-gradient(135deg, #ffd98a, #e6b961);
+  --bg-image:
+    radial-gradient(120% 30% at 50% -4%, rgba(157,184,255,.14), transparent 70%),
+    radial-gradient(1.4px 1.4px at 16% 30%, rgba(255,255,255,.5), transparent 60%),
+    radial-gradient(1.2px 1.2px at 55% 20%, rgba(255,255,255,.4), transparent 60%),
+    radial-gradient(1.5px 1.5px at 82% 52%, rgba(255,255,255,.45), transparent 60%),
+    linear-gradient(168deg, #060c1a, #0a1224 55%, #03070f);
+}
+
+/* ---------- 13 涟漪荷塘（背景动画：细涟漪 + 荷叶） ---------- */
+[data-scheme="ripple"] {
+  --font-display: "楷体", "KaiTi", "STKaiti", "Microsoft YaHei", sans-serif;
+  --bd: 18px;
+  --bg: #0d1f1c; --bg-deep: #081513; --bg-edge: #040d0b;
+  --fog-top: #14302a; --fog-bottom: #0d211d;
+  --panel: #102622; --panel-2: #18342e; --panel-3: #20433b;
+  --ink: #e8f2e9; --ink-dim: rgba(232,242,233,.6); --ink-faint: rgba(232,242,233,.24);
+  --accent: #f0a1b8; --accent-2: #d97a97; --accent-soft: rgba(240,161,184,.14);
+  --leaf: #8fd0a8; --danger: #ff9a8f; --btn-ink: #2a0a12;
+  --hairline: rgba(232,242,233,.14); --row-shadow: 0 1px 2px rgba(0,0,0,.35);
+  --frame-bg: linear-gradient(160deg, #14302a, #0d211d);
+  --frame-glow: 0 0 24px rgba(240,161,184,.12);
+  --controls-bg: linear-gradient(180deg, rgba(143,208,168,.05), rgba(0,0,0,.14));
+  --draw-bg: linear-gradient(135deg, #f0a1b8, #d97a97);
+  --bg-image:
+    radial-gradient(120% 40% at 70% -8%, rgba(240,161,184,.08), transparent 60%),
+    linear-gradient(175deg, #081513, #0d1f1c 50%, #0a1a17);
+}
+</style>
+</head>
+<body>
+
+<div class="gallery">
+
+  <!-- 左栏：方案列表 -->
+  <aside class="scheme-list" id="schemeList">
+    <div class="gallery-head">
+      <h1>天选之子 · 方案画廊</h1>
+      <p>13 套完整方案，同一套点名器与动画几何，全部 CSS 变量驱动。其中 5 套带<strong>克制背景动效</strong>（低透明 · 慢速 · 不抢戏）。点选任意方案查看效果。</p>
+    </div>
+    <!-- 方案卡由 JS 渲染 -->
+  </aside>
+
+  <!-- 右栏：预览 + 设计说明 -->
+  <main class="preview">
+    <div class="preview-stage">
+      <!-- 点名器壳（静态 3 行预览） -->
+      <div class="app-shell" data-scheme="mist" id="appShell">
+        <!-- 背景动效层（内容之下，由 JS 按方案生成元素） -->
+        <div class="bg-fx" id="bgFx"></div>
+        <div class="app">
+          <header class="topbar">
+            <h1 class="title">
+              <svg class="brand-leaf" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                   stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M12 20.5 C12 13 12 7 12 3.5"/>
+                <path d="M12 9 C8.5 7.5 6 4.5 4.5 2.5"/>
+                <path d="M12 9 C15.5 7.5 18 4.5 19.5 2.5"/>
+                <path d="M12 15 C8.5 13.5 6 10.5 4.5 8.5"/>
+                <path d="M12 15 C15.5 13.5 18 10.5 19.5 8.5"/>
+              </svg>
+              <span class="title-text">天选之子</span>
+              <span class="title-sub" id="titleSub">好运常青</span>
+            </h1>
+            <div class="toolbar">
+              <span class="icon-btn" title="主题">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+                     stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <path d="M19 14.5 A7.5 7.5 0 1 1 9.5 5 A6 6 0 0 0 19 14.5 Z"/>
+                  <path d="M4.2 9.5 l.9 .45 M5 4.8 l.6 .8 M9.2 3.4 l.3 1"/>
+                </svg>
+              </span>
+              <span class="icon-btn" title="设置">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+                     stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <circle cx="12" cy="12" r="3"/>
+                  <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+                </svg>
+              </span>
+            </div>
+          </header>
+
+          <main class="stage">
+            <div class="slot-frame">
+              <div class="slot-viewport">
+                <div class="slot-body">
+                  <div class="slot-row">9 柯雯耀</div>
+                  <div class="slot-row center">47 丁家豪</div>
+                  <div class="slot-row">10 李柳佳</div>
+                </div>
+                <div class="slot-mask top-mask"></div>
+                <div class="slot-mask bottom-mask"></div>
+              </div>
+            </div>
+            <p class="status-hint">可抽 47 人 · 屏息一瞬</p>
+          </main>
+
+          <footer class="controls">
+            <div class="side-stats side-left">
+              <span>已点名 0/47</span>
+            </div>
+            <button class="draw-btn">抽取</button>
+            <div class="side-stats side-right">
+              <span>已排除 5</span>
+              <button class="reset-btn">重置</button>
+            </div>
+          </footer>
+        </div>
+      </div>
+    </div>
+
+    <div class="notes" id="notes"></div>
+  </main>
+</div>
+
+<script>
+const SCHEMES = [
+  {
+    id: 'mist', name: '晨雾林窗', tag: '自然 · 雾光 · 安静',
+    sub: '好运常青', status: '现役', kind: 'shipped',
+    swatches: ['#1c2620', '#e9d48b', '#b6c98a', '#2a3b31'],
+    desc: '深夜的森林在晨光里慢慢醒来，雾气贴着树梢。深绿雾底托起奶油白的名字，正中的晨光金像第一缕穿过林隙的光。低对比、无刺眼光源——点名变成一件轻柔的事，适合长时间投影，学生抬眼即是清凉。',
+    keys: ['深林雾绿', '晨光金', '雾玻璃窗框', '自然治愈'],
+  },
+  {
+    id: 'chalk', name: '绿板粉笔 · 木质课堂', tag: '教室 · 复古 · 温暖',
+    sub: '课堂点名', status: '备存', kind: 'shipped',
+    swatches: ['#22352b', '#ffd95e', '#9a6739', '#f3efe2'],
+    desc: '回到教室最熟悉的模样：墨绿黑板、黄粉笔、木相框与整条木质讲台。粉笔手写体带着颗粒感，主按钮是一块厚木牌。怀旧的温度——老师站在讲台前，学生听见粉笔落在黑板上的那一声。',
+    keys: ['黑板粉笔', '木质相框', '讲台', '复古温暖'],
+  },
+  {
+    id: 'lantern', name: '纸灯笼 · 暖巷', tag: '民俗 · 橘光 · 节庆',
+    sub: '灯下喜圆', status: '新提案', kind: 'proposal',
+    swatches: ['#2c1710', '#ffb060', '#f9e6c8', '#5a2c16'],
+    desc: '黄昏的老巷口，纸灯笼一盏盏亮起来，橘光落在青砖上。整个界面像一盏透光的灯笼肚：焦糖色的宣纸、暖到发甜的橘金。抽中名字时，灯笼光晕轻轻漫过窗框——有种「灯下揭榜」的仪式感。',
+    keys: ['纸灯笼', '暖橘金', '光晕', '民俗温度'],
+  },
+  {
+    id: 'starlit', name: '星夜营地', tag: '户外 · 星空 · 篝火',
+    sub: '篝火围坐', status: '新提案', kind: 'proposal',
+    swatches: ['#0f1b30', '#ffb36b', '#c7d3ff', '#1b2b4d'],
+    desc: '湖畔的营地夜：深蓝星幕上缀着零星的星，篝火在画面右下角暖融融地烧。点名器像围坐在篝火旁传一根树枝——天上星星眼看着，火光陪着，紧张感被夜风和暖意稀释。适合研学、夏令营、户外班会。',
+    keys: ['深蓝星空', '篝火橙', '星光点缀', '户外浪漫'],
+  },
+  {
+    id: 'ink', name: '水墨竹影', tag: '古典 · 留白 · 雅静',
+    sub: '笔墨生花', status: '新提案', kind: 'proposal',
+    swatches: ['#f2ede0', '#b43a2a', '#33302a', '#5f7b5a'],
+    desc: '一页宣纸，几竿竹影，正中一枚朱砂印。水墨的克制在于敢留白：浅色纸底上，墨色名字安静排开，点中的那位沾上朱砂红——像老师在花名册上落下一枚印。安静、古雅、见功力。',
+    keys: ['宣纸白', '墨色', '朱砂印', '古典留白'],
+  },
+  {
+    id: 'candy', name: '糖果游园', tag: '低年级 · 马卡龙 · 软萌',
+    sub: '甜心请选', status: '新提案', kind: 'proposal',
+    swatches: ['#fdf3e7', '#ff7296', '#8fd3b4', '#f6d9c8'],
+    desc: '游园会的气球和棉花糖：奶黄的天空、草莓粉的主按钮、薄荷绿的角落泡泡。大圆角、软光线、低饱和甜彩——被点到名字不再紧张，而像抽中一颗水果糖。低年级课堂的快乐补给。',
+    keys: ['马卡龙', '大圆角', '泡泡', '甜美治愈'],
+  },
+  {
+    id: 'neon', name: '霓虹夜航', tag: '赛博 · 反转 · 酷',
+    sub: '全员覆盖', status: '新提案', kind: 'proposal',
+    swatches: ['#0d1020', '#2ff3e8', '#ff4fd8', '#161b33'],
+    desc: '雨夜的赛博城：青霓虹、紫电网、粉灯牌。点名器变成一块悬浮终端，名字带一层微弱的辉光，转轴像数据流在跑。「下一位是谁」变成「下一个坐标是谁」——全班屏息，像在按下一个未知的按钮。反差感极强，酷到忘了是点名。',
+    keys: ['霓虹青', '网格光', '辉光文字', '赛博酷感'],
+  },
+  {
+    id: 'aurora', name: '极光极夜', tag: '极地 · 静谧 · 穹顶',
+    sub: '星光作证', status: '新提案', kind: 'proposal',
+    swatches: ['#081820', '#6ff3ce', '#a58cff', '#0f2634'],
+    desc: '极夜的雪原上，青绿与紫的极光在头顶缓缓流动，星河细碎。界面是极光下的营地窗——冷青的底，名字浮在微光里，被点中的那一位像极光最亮的一刹那。静到能听见雪落的声音。',
+    keys: ['极光青绿', '极夜深蓝', '星点', '静谧穹顶'],
+  },
+  {
+    id: 'firefly', name: '萤火秘境', tag: '背景动画 · 夜林 · 静谧',
+    sub: '林间夜语', status: '新提案', kind: 'proposal',
+    swatches: ['#0d1712', '#ffd98a', '#12221a', '#9fd4a8'],
+    desc: '夏夜的林间，几只萤火虫提着小灯缓缓巡游——光点很小、步伐很慢，只在画面边缘亮起又暗下。中央的名字窗保持绝对安静，点名时全班的目光仍然落在正中，萤火只在余光里替你紧张。',
+    keys: ['萤火巡游', '金色小灯', '夜景深绿', '克制微光'],
+  },
+  {
+    id: 'sakura', name: '樱瓣微风', tag: '背景动画 · 春日 · 治愈',
+    sub: '春风落款', status: '新提案', kind: 'proposal',
+    swatches: ['#fbeef0', '#e0709b', '#f0d6db', '#7fbfa0'],
+    desc: '春风把几片樱瓣送进画面：落得慢、飘得轻、颜色淡到像水彩余韵。浅粉底上是暖奶茶色的名字，花瓣绕过窗框无声落下——紧张的气氛被柔软地化开，适合低年级的午后课堂。',
+    keys: ['樱瓣飘落', '水彩淡粉', '春日治愈', '轻柔慢落'],
+  },
+  {
+    id: 'kite', name: '纸鸢青空', tag: '背景动画 · 晴空 · 松弛',
+    sub: '放晴一课', status: '新提案', kind: 'proposal',
+    swatches: ['#dcecf8', '#e2543a', '#f0f8fc', '#4e9a5a'],
+    desc: '晴空里两只纸鸢慢慢打着转，白棉云从一侧缓缓穿过整个画面。图案在动，但动得像午后一样懒——名字窗始终静立，像坐在草地上抬头看天。点名因此变得放松，像在等一朵云飘过。',
+    keys: ['纸鸢剪影', '云朵横移', '晴空春蓝', '午后慵懒'],
+  },
+  {
+    id: 'star', name: '星河流转', tag: '背景动画 · 星河 · 许愿',
+    sub: '星河许愿', status: '新提案', kind: 'proposal',
+    swatches: ['#0a1224', '#ffd98a', '#101c33', '#9db8ff'],
+    desc: '深夜的河岸，八颗星静静眨眼，偶尔一颗流星斜斜划过又迅速熄灭。星光细碎、稀疏、慢半拍——点名在星空下进行，像在许一个愿：抽中的那一瞬，恰好有颗星为你落下。',
+    keys: ['星光眨眼', '流星许愿', '极蓝夜空', '稀疏细碎'],
+  },
+  {
+    id: 'ripple', name: '涟漪荷塘', tag: '背景动画 · 夏夜 · 水静',
+    sub: '水色一夏', status: '新提案', kind: 'proposal',
+    swatches: ['#0d1f1c', '#f0a1b8', '#14302a', '#8fd0a8'],
+    desc: '夏夜的水面泛着极淡的涟漪，一圈圈散开又归于平静，角落一片荷叶轻轻摇摆。整幅画面水波不兴，中央的名字却像浮在水上——被点中的那位，像石子落下激起的第一个人影。',
+    keys: ['细涟漪', '荷叶摇摆', '夏夜水面', '水波不兴'],
+  },
+];
+
+/* 背景动效配置：每套方案的元素类型与数量（JS 生成，CSS 负责外观与错峰） */
+const FX_CFG = {
+  firefly: { dots: 6 },
+  sakura:  { petals: 8 },
+  kite:    { kites: 2, clouds: 3 },
+  star:    { stars: 8, meteors: 2 },
+  ripple:  { rings: 4, leaves: 1 },
+};
+
+function renderFx(id) {
+  const box = document.getElementById('bgFx');
+  const cfg = FX_CFG[id];
+  if (!cfg) { box.innerHTML = ''; return; }
+  let html = '';
+  if (cfg.dots)    html += '<i class="fx dot"></i>'.repeat(cfg.dots);
+  if (cfg.petals)  html += '<i class="fx petal"></i>'.repeat(cfg.petals);
+  if (cfg.kites)   html += '<i class="fx kite"></i>'.repeat(cfg.kites);
+  if (cfg.clouds)  html += '<i class="fx cloud"></i>'.repeat(cfg.clouds);
+  if (cfg.stars)   html += '<i class="fx star"></i>'.repeat(cfg.stars);
+  if (cfg.meteors) html += '<i class="fx meteor"></i>'.repeat(cfg.meteors);
+  if (cfg.rings)   html += '<i class="fx ring"></i>'.repeat(cfg.rings);
+  if (cfg.leaves)  html += '<i class="fx leaf"></i>'.repeat(cfg.leaves);
+  box.innerHTML = html;
+}
+
+const list = document.getElementById('schemeList');
+const shell = document.getElementById('appShell');
+const titleSub = document.getElementById('titleSub');
+const notes = document.getElementById('notes');
+const stage = document.querySelector('.preview-stage');
+
+function renderList() {
+  list.innerHTML = SCHEMES.map((s, i) => `
+    <div class="scheme-card" data-id="${s.id}" data-i="${i}">
+      <div class="card-top">
+        <span class="card-name">${i + 1}. ${s.name}</span>
+        <span class="card-badge ${s.kind}">${s.status}</span>
+      </div>
+      <div class="card-tag">${s.tag}</div>
+      <div class="swatches">
+        ${s.swatches.slice(0, 4).map(c => `<span class="swatch" style="background:${c}"></span>`).join('')}
+      </div>
+    </div>`).join('');
+}
+
+function applyScheme(i, skipAnim) {
+  const s = SCHEMES[i];
+  shell.dataset.scheme = s.id;
+  titleSub.textContent = s.sub;
+  renderFx(s.id);
+  notes.innerHTML = `
+    <div class="notes-name">${s.name}<span class="pos">${s.status} · ${s.tag}</span></div>
+    <div class="notes-desc">${s.desc}</div>
+    <div class="notes-keys">${s.keys.map(k => `<span class="key">${k}</span>`).join('')}</div>`;
+  [...list.querySelectorAll('.scheme-card')].forEach(c => c.classList.toggle('active', +c.dataset.i === i));
+  if (!skipAnim) {
+    stage.style.animation = 'none';
+    void stage.offsetWidth;
+    stage.style.animation = '';
+  }
+}
+
+list.addEventListener('click', e => {
+  const card = e.target.closest('.scheme-card');
+  if (!card) return;
+  applyScheme(+card.dataset.i);
+});
+
+renderList();
+applyScheme(0, true);
+</script>
+</body>
+</html>

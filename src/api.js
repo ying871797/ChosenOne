@@ -10,13 +10,24 @@
 
   // ---------- 浏览器 mock 数据层 ----------
   function createMock() {
-    const mockNames = ["张三", "李四", "王五", "赵六", "钱七", "孙八", "周九", "吴十"];
-    let roster = { names: mockNames, excluded: [] };
+    const mockNames = [
+      "1 韩梓睿", "2 段宗翰", "3 韩佳婷", "4 徐乙苏", "5 高元煜", "6 陈雨蛟",
+      "7 韦骁洋", "8 应响", "9 柯雯耀", "10 李柳佳", "11 范雅怡", "12 李保辰",
+      "13 杨凯博", "14 高嘉雯", "15 孙熙航", "16 牛雨畅", "17 申婧琪", "18 王宇鹏",
+      "19 李伊璇", "20 韩荞旭", "21 袁浩彤", "22 刘容", "23 吴宇涵", "24 宋嘉琪",
+      "25 张艺琳", "26 孙永安", "27 刘博羽", "28 遆思辰", "29 裴玟", "30 张宇翔",
+      "31 柴子豪", "32 赵久伟", "33 纪宇轩", "34 何雨凡", "35 赵子豪", "36 肖梦琪",
+      "37 吴捷", "38 闫奥城", "39 吴李金", "40 王文博", "41 韩志颖", "42 何向铮",
+      "43 黄旭初", "44 李睿", "45 张妍", "46 李胤祺", "47 丁家豪", "48 姬雨馨",
+      "49 赵一博", "50 杨雨桐", "51 邓佳辰", "52 尉凌菲",
+    ];
+    const mockExcluded = ["37 吴捷", "48 姬雨馨", "15 孙熙航", "4 徐乙苏", "1 韩梓睿"];
+    let roster = { names: mockNames, excluded: mockExcluded };
     const listeners = [];
 
     return {
       getRoster: async () => roster,
-      loadSettings: async () => ({ theme: "dark", background: "" }),
+      loadSettings: async () => ({ theme: "dark", scheme: "mist", background: "" }),
       saveSettings: async () => {},
       getAppDir: async () => "（浏览器预览模式，无应用目录）",
       openAppDir: async () => { alert("浏览器预览模式下无法打开应用目录"); },

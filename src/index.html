@@ -7,61 +7,105 @@
   <link rel="stylesheet" href="style.css">
 </head>
 <body data-theme="dark">
-  <div class="app">
-    <!-- 顶栏 -->
-    <header class="topbar">
-      <h1 class="title">🎲 天选之子</h1>
-      <div class="toolbar">
-        <button id="themeBtn" class="icon-btn" title="切换主题">🌗</button>
-        <button id="settingsBtn" class="icon-btn" title="设置">⚙️</button>
-      </div>
-    </header>
-
-    <!-- 老虎机名字区 -->
-    <main class="stage">
-      <div class="slot-viewport">
-        <div class="slot-list" id="slotList">
-          <div class="slot-row"></div>
-          <div class="slot-row"></div>
-          <div class="slot-row"></div>
-          <div class="slot-row"></div>
-          <div class="slot-row"></div>
+  <!-- .ui-shell：等比缩放载体（main.js 按窗口尺寸设置 zoom），
+       内部 DOM 布局尺寸保持设计基准，视觉随 zoom 整体缩放 -->
+  <div class="ui-shell">
+    <!-- 背景动效层（内容之下，纯装饰：晨雾漂移 + 晨光呼吸，低透明不抢戏） -->
+    <div class="bg-fx" aria-hidden="true">
+      <div class="mist mist-a"></div>
+      <div class="mist mist-b"></div>
+      <div class="mist mist-c"></div>
+      <div class="glow"></div>
+      <!-- 绿板粉笔方案的背景动效元素（晨雾林窗下隐藏） -->
+      <i class="dust"></i><i class="dust"></i><i class="dust"></i>
+      <i class="dust"></i><i class="dust"></i><i class="dust"></i>
+    </div>
+    <div class="app">
+      <!-- 顶栏 -->
+      <header class="topbar">
+        <h1 class="title">
+          <svg class="brand-leaf" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+               stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M12 20.5 C12 13 12 7 12 3.5"/>
+            <path d="M12 9 C8.5 7.5 6 4.5 4.5 2.5"/>
+            <path d="M12 9 C15.5 7.5 18 4.5 19.5 2.5"/>
+            <path d="M12 15 C8.5 13.5 6 10.5 4.5 8.5"/>
+            <path d="M12 15 C15.5 13.5 18 10.5 19.5 8.5"/>
+          </svg>
+          <span class="title-text">天选之子</span>
+          <span class="title-sub">好运常青</span>
+        </h1>
+        <div class="toolbar">
+          <button id="themeBtn" class="icon-btn" title="切换主题（夜林 ⇄ 晨光）">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+                 stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M19 14.5 A7.5 7.5 0 1 1 9.5 5 A6 6 0 0 0 19 14.5 Z"/>
+              <path d="M4.2 9.5 l.9 .45 M5 4.8 l.6 .8 M9.2 3.4 l.3 1"/>
+            </svg>
+          </button>
+          <button id="settingsBtn" class="icon-btn" title="设置">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+                 stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <circle cx="12" cy="12" r="3"/>
+              <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+            </svg>
+          </button>
         </div>
-        <!-- 目标行高亮玻璃 -->
-        <div class="slot-mask top-mask"></div>
-        <div class="slot-mask bottom-mask"></div>
-      </div>
-      <p class="status-hint" id="statusHint">准备就绪</p>
-    </main>
+      </header>
 
-    <!-- 主按钮 + 底部状态栏 -->
-    <footer class="controls">
-      <button id="drawBtn" class="draw-btn">🎲 抽取天选之子</button>
-      <div class="statusbar">
-        <span id="pickedCount">已点名 0/0</span>
-        <span id="excludedCount">已排除 0</span>
-        <button id="resetBtn" class="reset-btn">🔄 重置</button>
-      </div>
-    </footer>
-  </div>
-
-  <!-- 设置面板 -->
-  <div class="overlay" id="settingsOverlay" hidden>
-    <div class="panel">
-      <h2>设置</h2>
-      <div class="field">
-        <label>主题</label>
-        <div class="seg">
-          <button data-theme="dark" class="seg-btn">深色</button>
-          <button data-theme="light" class="seg-btn">浅色</button>
+      <!-- 老虎机名字区（林窗） -->
+      <main class="stage">
+        <div class="slot-frame">
+          <div class="slot-viewport">
+            <div class="slot-list" id="slotList">
+              <!-- 条带行由 main.js 按滚动序列长度构建（42 行），勿手写行 -->
+            </div>
+            <!-- 窗口上下边缘雾化遮罩 -->
+            <div class="slot-mask top-mask"></div>
+            <div class="slot-mask bottom-mask"></div>
+          </div>
         </div>
+        <p class="status-hint" id="statusHint">准备就绪</p>
+      </main>
+
+      <!-- 控制区（三栏对称：状态｜中央抽取按钮｜状态） -->
+      <footer class="controls">
+        <div class="side-stats side-left">
+          <span id="pickedCount">已点名 0/0</span>
+        </div>
+        <button id="drawBtn" class="draw-btn">抽取</button>
+        <div class="side-stats side-right">
+          <span id="excludedCount">已排除 0</span>
+          <button id="resetBtn" class="reset-btn">重置</button>
+        </div>
+      </footer>
+    </div>
+
+    <!-- 设置面板（置于 .ui-shell 内，随整体等比缩放） -->
+    <div class="overlay" id="settingsOverlay" hidden>
+      <div class="panel">
+        <h2>设置</h2>
+        <div class="field">
+          <label>界面方案</label>
+          <div class="seg">
+            <button data-scheme="mist" class="seg-btn">晨雾林窗</button>
+            <button data-scheme="chalk" class="seg-btn">绿板粉笔</button>
+          </div>
+        </div>
+        <div class="field">
+          <label>主题</label>
+          <div class="seg">
+            <button data-theme="dark" class="seg-btn">夜林</button>
+            <button data-theme="light" class="seg-btn">晨光</button>
+          </div>
+        </div>
+        <div class="field">
+          <label>背景图片文件名（放入应用目录）</label>
+          <input type="text" id="bgInput" placeholder="如 bg_custom.png，留空为默认">
+          <button id="openDirBtn" class="ghost-btn">打开应用目录</button>
+        </div>
+        <button id="panelCloseBtn" class="ghost-btn">关闭</button>
       </div>
-      <div class="field">
-        <label>背景图片文件名（放入应用目录）</label>
-        <input type="text" id="bgInput" placeholder="如 bg_custom.png，留空为默认">
-        <button id="openDirBtn" class="ghost-btn">📂 打开应用目录</button>
-      </div>
-      <button id="panelCloseBtn" class="ghost-btn">关闭</button>
     </div>
   </div>
 

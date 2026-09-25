@@ -13,10 +13,10 @@
     "windows": [
       {
         "title": "天选之子",
-        "width": 480,
-        "height": 720,
-        "minWidth": 400,
-        "minHeight": 600,
+        "width": 800,
+        "height": 500,
+        "minWidth": 640,
+        "minHeight": 400,
         "resizable": true,
         "center": true
       }

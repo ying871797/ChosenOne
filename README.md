@@ -51,7 +51,7 @@ npx tauri build --no-bundle   # → src-tauri/target/release/chosenone.exe
 |---|---|
 | `names.txt` | 名单，每行一个名字；缺失时自动生成示例 |
 | `excluded.txt` | 排除名单；缺失视为无排除 |
-| `settings.json` | 界面方案/主题/背景设置 |
+| `settings.json` | 界面方案/主题/字体大小/背景设置 |
 | 背景图片 | 可选，放入应用目录后到设置面板填写文件名 |
 
 解析规则：每行一个名字、去除首尾空白、忽略空行与 `#` 注释、去重保序；

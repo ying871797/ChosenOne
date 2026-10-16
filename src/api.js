@@ -27,7 +27,7 @@
 
     return {
       getRoster: async () => roster,
-      loadSettings: async () => ({ theme: "dark", scheme: "mist", background: "" }),
+      loadSettings: async () => ({ theme: "dark", scheme: "mist", fontScale: 1, background: "" }),
       saveSettings: async () => {},
       getAppDir: async () => "（浏览器预览模式，无应用目录）",
       openAppDir: async () => { alert("浏览器预览模式下无法打开应用目录"); },

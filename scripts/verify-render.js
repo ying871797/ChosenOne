@@ -122,8 +122,39 @@ async function main() {
     const rowsOk = data.rows === 42;
 
     if (vpWOk && vpHOk && centerOk && rowsOk) {
-      console.log(`PASS 视口宽=${data.vpW} 高=${data.vpH} 行数=${data.rows} 中心命中=${data.centerClass} 中央文本=${JSON.stringify(data.centerRowText)}`);
-      process.exitCode = 0;
+      // 字体大小系数：真 CSS 变量链（滑条 input → --name-size → computed font-size）
+      // 变量断言精确像素（zoom 无关）；computed 只做方向性断言（窗口缩放下 zoom 会参与计算）。
+      const font = JSON.parse(await evaluate(`(() => {
+        const row = document.querySelector('.slot-row');
+        const input = document.getElementById('fontScaleInput');
+        const varOf = () => getComputedStyle(document.body).getPropertyValue('--name-size').trim();
+        const before = varOf();
+        const computedBefore = parseFloat(getComputedStyle(row).fontSize);
+        input.value = '1.5';
+        input.dispatchEvent(new Event('input', { bubbles: true }));
+        const after = varOf();
+        const computedAfter = parseFloat(getComputedStyle(row).fontSize);
+        const display = document.getElementById('fontScaleValue').textContent;
+        input.value = '1';
+        input.dispatchEvent(new Event('input', { bubbles: true }));
+        return JSON.stringify({ before, after, restored: varOf(), computedBefore, computedAfter, display });
+      })()`));
+      // 变量链像素精确；computed 用比值断言抵消窗口 zoom（63/42 = 1.5）
+      const ratio = font.computedAfter / font.computedBefore;
+      const fontOk =
+        font.before === '42px' &&
+        font.after === '63px' &&
+        font.restored === '42px' &&
+        Math.abs(ratio - 63 / 42) < 0.01 &&
+        font.display === '1.5×';
+
+      if (fontOk) {
+        console.log(`PASS 视口宽=${data.vpW} 高=${data.vpH} 行数=${data.rows} 中心命中=${data.centerClass} 中央文本=${JSON.stringify(data.centerRowText)} 字号链=${font.before}→${font.after}(${font.display}) computed=${font.computedAfter}`);
+        process.exitCode = 0;
+      } else {
+        console.log(`FAIL 字号链 ${JSON.stringify(font)}（期望 42→63px 恢复 42px 读数 1.5×）`);
+        process.exitCode = 1;
+      }
     } else {
       console.log(`FAIL 视口宽=${data.vpW}(${vpWOk ? 'OK' : '塌缩!'}) 高=${data.vpH} 行数=${data.rows} 中心命中=${data.centerClass}(${centerOk ? 'OK' : '未命中!'})`);
       process.exitCode = 1;

@@ -3,6 +3,21 @@ use std::fs;
 use std::io;
 use std::path::Path;
 
+/// 字体大小系数（名单区字号缩放）合法区间与默认值。
+/// 上下限由动画契约的硬约束推得：行高 80px、视口 240px、名字基准 42/46px
+/// （46 × 1.5 = 69px，字形高约 61px，仍在 80px 行高内；更大则会裁切字形）。
+pub const FONT_SCALE_MIN: f64 = 0.8;
+pub const FONT_SCALE_MAX: f64 = 1.5;
+const FONT_SCALE_DEFAULT: f64 = 1.0;
+
+/// 归一化字号系数：非有限数回落默认值，越界 clamp 到合法区间。
+fn normalize_font_scale(value: f64) -> f64 {
+    if !value.is_finite() {
+        return FONT_SCALE_DEFAULT;
+    }
+    value.clamp(FONT_SCALE_MIN, FONT_SCALE_MAX)
+}
+
 /// 持久化的应用设置。
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -13,14 +28,23 @@ pub struct Settings {
     /// 缺省/未知值时归一化为 `mist`（兼容旧版 settings.json）
     #[serde(default)]
     pub scheme: String,
+    /// 字体大小系数（名单区字号 × 系数，0.8~1.5）；缺省 1.0
+    #[serde(default = "default_font_scale")]
+    pub font_scale: f64,
     /// 背景图片文件名；空串表示使用默认纯色背景
     pub background: String,
 }
 
+fn default_font_scale() -> f64 {
+    FONT_SCALE_DEFAULT
+}
+
 #[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
 struct PersistedSettings {
     theme: Option<String>,
     scheme: Option<String>,
+    font_scale: Option<f64>,
     background: Option<String>,
 }
 
@@ -29,6 +53,7 @@ impl Default for Settings {
         Settings {
             theme: "dark".to_string(),
             scheme: "mist".to_string(),
+            font_scale: FONT_SCALE_DEFAULT,
             background: String::new(),
         }
     }
@@ -49,6 +74,7 @@ pub fn load_settings(path: &Path) -> io::Result<Settings> {
         .map(|saved| Settings {
             theme: saved.theme.unwrap_or_else(|| "dark".to_string()),
             scheme: saved.scheme.unwrap_or_else(|| "mist".to_string()),
+            font_scale: normalize_font_scale(saved.font_scale.unwrap_or(FONT_SCALE_DEFAULT)),
             background: saved.background.unwrap_or_default(),
         })
         .unwrap_or_default();
@@ -92,6 +118,7 @@ mod tests {
         let s = load_settings(&p).unwrap();
         assert_eq!(s.theme, "dark");
         assert_eq!(s.scheme, "mist");
+        assert_eq!(s.font_scale, 1.0);
         assert_eq!(s.background, "");
         let _ = std::fs::remove_file(&p);
     }
@@ -102,6 +129,7 @@ mod tests {
         let s = load_settings(&p).unwrap();
         assert_eq!(s.theme, "dark");
         assert_eq!(s.scheme, "mist");
+        assert_eq!(s.font_scale, 1.0);
         let _ = std::fs::remove_file(&p);
     }
 
@@ -111,12 +139,14 @@ mod tests {
         let s = Settings {
             theme: "light".into(),
             scheme: "chalk".into(),
+            font_scale: 1.15,
             background: "bg.png".into(),
         };
         save_settings(&p, &s).unwrap();
         let loaded = load_settings(&p).unwrap();
         assert_eq!(loaded.theme, "light");
         assert_eq!(loaded.scheme, "chalk");
+        assert_eq!(loaded.font_scale, 1.15);
         assert_eq!(loaded.background, "bg.png");
         let _ = std::fs::remove_file(&p);
     }
@@ -199,6 +229,47 @@ mod tests {
         assert_eq!(loaded.theme, "dark");
         // theme 归一化不波及合法的 scheme
         assert_eq!(loaded.scheme, "chalk");
+        let _ = std::fs::remove_file(&p);
+    }
+
+    #[test]
+    fn legacy_file_without_font_scale_defaults_to_one() {
+        let p = temp_write(
+            "settings-legacy-font-scale",
+            br#"{"theme":"light","scheme":"chalk","background":""}"#,
+        );
+        let loaded = load_settings(&p).unwrap();
+        assert_eq!(loaded.font_scale, 1.0);
+        // font_scale 缺省不波及其他字段
+        assert_eq!(loaded.theme, "light");
+        assert_eq!(loaded.scheme, "chalk");
+        let _ = std::fs::remove_file(&p);
+    }
+
+    #[test]
+    fn out_of_range_font_scale_is_clamped() {
+        let p = temp_write(
+            "settings-clamp-high",
+            br#"{"theme":"dark","scheme":"mist","fontScale":2.5,"background":""}"#,
+        );
+        assert_eq!(load_settings(&p).unwrap().font_scale, FONT_SCALE_MAX);
+        let _ = std::fs::remove_file(&p);
+
+        let p = temp_write(
+            "settings-clamp-low",
+            br#"{"theme":"dark","scheme":"mist","fontScale":0.1,"background":""}"#,
+        );
+        assert_eq!(load_settings(&p).unwrap().font_scale, FONT_SCALE_MIN);
+        let _ = std::fs::remove_file(&p);
+    }
+
+    #[test]
+    fn null_font_scale_uses_default_one() {
+        let p = temp_write(
+            "settings-null-font-scale",
+            br#"{"theme":"dark","scheme":"mist","fontScale":null,"background":""}"#,
+        );
+        assert_eq!(load_settings(&p).unwrap().font_scale, 1.0);
         let _ = std::fs::remove_file(&p);
     }
 }

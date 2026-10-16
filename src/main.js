@@ -32,6 +32,8 @@
   const panelCloseBtn = document.getElementById("panelCloseBtn");
   const bgInput = document.getElementById("bgInput");
   const openDirBtn = document.getElementById("openDirBtn");
+  const fontScaleInput = document.getElementById("fontScaleInput");
+  const fontScaleValue = document.getElementById("fontScaleValue");
   const segBtns = Array.from(document.querySelectorAll(".seg-btn[data-theme]"));
   const schemeSegBtns = Array.from(document.querySelectorAll(".seg-btn[data-scheme]"));
 
@@ -178,20 +180,62 @@
   const ROLL_RANDOM_COUNT = 39;              // 随机段行数；收尾段 3 行 = [非目标, 目标, 非目标]
   const ROLL_ROWS = ROLL_RANDOM_COUNT + 3;   // 条带行数 = 序列长度（42 行）
 
+  // 字号系数（名单区）合法区间与默认值；上下限由行高 80px 硬约束推得：
+  // 46×1.5 = 69px，字形高约 61px，仍留在 80px 行高内；再大（如 3×）字形会被裁切。
+  // hit-pop 的 scale(1.15) 连同行盒一起缩放，不额外占用行高。与 settings.json 的 fontScale 同步。
+  const FONT_SCALE_MIN = 0.8;
+  const FONT_SCALE_MAX = 1.5;
+  let fontScale = 1; // 当前系数；applyFontScale 归一化后写入
+
+  /** 归一化字号系数：非法值（NaN/Infinity/越界）回落默认或 clamp。 */
+  function clampFontScale(value) {
+    const n = Number(value);
+    if (!Number.isFinite(n)) return 1;
+    return Math.min(Math.max(n, FONT_SCALE_MIN), FONT_SCALE_MAX);
+  }
+
+  /** 系数读数文案：1 → "1.0×"，0.85 → "0.85×"。 */
+  function formatFontScale(s) {
+    return `${s.toFixed(2).replace(/0$/, "")}×`;
+  }
+
   // 超长名字自适应字号（可抽名宽度上限：视口最大宽 560px，中文一字 ≈ 字号 + 2px 字距）
+  // base = 档位基准字号（px），实际行内字号 = base × fontScale；
+  // base 0 = 不写行内样式，走 CSS 变量（--name-size / --name-size-center，已随系数联动）。
   const FONT_SIZE_TIERS = [
-    { maxLen: 8, size: "" },     // 默认字号（CSS：常行 42px / 中央行 46px）
-    { maxLen: 11, size: "30px" },
-    { maxLen: 14, size: "24px" },
-    { maxLen: Infinity, size: "20px" },
+    { maxLen: 8, base: 0 },       // 默认字号（CSS：常行 42px / 中央行 46px × 系数）
+    { maxLen: 11, base: 30 },
+    { maxLen: 14, base: 24 },
+    { maxLen: Infinity, base: 20 },
   ];
   function applyRowFont(row, name) {
     const len = String(name).length;
     let size = "";
     for (const t of FONT_SIZE_TIERS) {
-      if (len <= t.maxLen) { size = t.size; break; }
+      if (len <= t.maxLen) {
+        if (t.base) size = `${Math.round(t.base * fontScale)}px`;
+        break;
+      }
     }
     row.style.fontSize = size;
+  }
+
+  /**
+   * 应用名单区字号系数（设置面板「字体大小」）：
+   * ① 更新 body 上的 CSS 变量 --name-size（42×s）/ --name-size-center（46×s）；
+   * ② 档位行内字号需重跑 applyRowFont 刷已填各行（空行不受影响）。
+   * 仅改字级：行高 80 / 视口 240 / 42 行条带 / 滚动动画几何零改动。
+   * @param {number} value 目标系数
+   * @returns {number} 归一化后的系数
+   */
+  function applyFontScale(value) {
+    const s = clampFontScale(value);
+    fontScale = s;
+    // 取整像素：避免 42×1.3=54.5999… 浮点噪声污染 CSS 值
+    document.body.style.setProperty("--name-size", `${Math.round(42 * s)}px`);
+    document.body.style.setProperty("--name-size-center", `${Math.round(46 * s)}px`);
+    rows.forEach((row) => applyRowFont(row, row.textContent));
+    return s;
   }
 
   /**
@@ -383,6 +427,19 @@
     refreshStatus();
   }
 
+  /**
+   * 设置面板「字体大小」：应用系数并同步 currentSettings 与滑条读数。
+   * 不做 IO —— 拖动（input）只预览；松手（change）才由事件绑定处调用 saveCurrentSettings 落盘。
+   * @returns {number} 归一化后的系数
+   */
+  function setFontScale(value) {
+    const s = applyFontScale(value);
+    currentSettings.fontScale = s; // 预览值进入当前设置，后续任意字段保存都携带它，避免被旧值冲掉
+    fontScaleInput.value = String(s);
+    fontScaleValue.textContent = formatFontScale(s);
+    return s;
+  }
+
   async function applyBackground(filename) {
     throwIfSettingsLoadFailed();
     settingsRevision += 1;
@@ -434,7 +491,7 @@
     }
   }
 
-  let currentSettings = { theme: "dark", scheme: "mist", background: "" };
+  let currentSettings = { theme: "dark", scheme: "mist", fontScale: 1, background: "" };
   let settingsSaveTail = Promise.resolve();
   let settingsRevision = 0;
   let settingsLoadPatches = null;
@@ -486,6 +543,8 @@
       loadedSettings = {
         theme: loaded?.theme === "light" ? "light" : "dark",
         scheme: loaded?.scheme === "chalk" ? "chalk" : "mist",
+        // 后端已 clamp；此处对浏览器预览/异常载荷再兜一层（非数字 → 1.0）
+        fontScale: clampFontScale(typeof loaded?.fontScale === "number" ? loaded.fontScale : NaN),
         background: typeof loaded?.background === "string" ? loaded.background : "",
       };
     } catch (e) {
@@ -515,6 +574,7 @@
     segBtns.forEach((b) => b.classList.toggle("active", b.dataset.theme === currentSettings.theme));
     document.body.dataset.scheme = currentSettings.scheme;
     schemeSegBtns.forEach((b) => b.classList.toggle("active", b.dataset.scheme === currentSettings.scheme));
+    setFontScale(currentSettings.fontScale);
     const newerBackgroundRequest =
       latestBackgroundRequest && latestBackgroundRequest.revision > backgroundLoadRevision
         ? latestBackgroundRequest
@@ -706,6 +766,15 @@
   );
   schemeSegBtns.forEach((btn) =>
     btn.addEventListener("click", () => handleSettingAction(() => applyScheme(btn.dataset.scheme)))
+  );
+  // 字体大小：input 拖动只实时预览，change（松手）才写 settings.json
+  fontScaleInput.addEventListener("input", () => {
+    const s = setFontScale(fontScaleInput.value);
+    // 设置仍在加载时记录补丁：迟到的默认值不得覆盖用户预览（与 saveCurrentSettings 同机制）
+    if (settingsLoadPatches) settingsLoadPatches.fontScale = s;
+  });
+  fontScaleInput.addEventListener("change", () =>
+    handleSettingAction(() => saveCurrentSettings({ fontScale: currentSettings.fontScale }))
   );
   bgInput.addEventListener("change", () =>
     handleSettingAction(() => applyBackground(bgInput.value.trim()))

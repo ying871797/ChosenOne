@@ -23,13 +23,15 @@ const els = {
   statusHint: makeEl("statusHint"), themeBtn: makeEl("themeBtn"), settingsBtn: makeEl("settingsBtn"),
   settingsOverlay: makeEl("settingsOverlay"), panelCloseBtn: makeEl("panelCloseBtn"),
   bgInput: makeEl("bgInput"), openDirBtn: makeEl("openDirBtn"),
+  fontScaleInput: makeEl("fontScaleInput"), fontScaleValue: makeEl("fontScaleValue"),
 };
 const uiShell = makeEl("ui-shell");
 globalThis.document = {
   getElementById: id => els[id], querySelectorAll: () => [],
   querySelector: sel => (sel === ".ui-shell" ? uiShell : null),
   createElement: () => makeEl("row"),
-  body: { dataset: { theme: "dark" }, style: {} },
+  // CSS 变量驱动字号系数（--name-size 等）：桩用普通对象模拟 setProperty
+  body: { dataset: { theme: "dark" }, style: { setProperty(k, v) { this[k] = v; } } },
 };
 globalThis.window = {
   innerWidth: 800,

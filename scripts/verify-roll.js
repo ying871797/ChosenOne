@@ -45,6 +45,8 @@ const els = {
   panelCloseBtn: makeEl("panelCloseBtn"),
   bgInput: makeEl("bgInput"),
   openDirBtn: makeEl("openDirBtn"),
+  fontScaleInput: makeEl("fontScaleInput"),
+  fontScaleValue: makeEl("fontScaleValue"),
 };
 
 const uiShell = makeEl("ui-shell");
@@ -53,7 +55,11 @@ globalThis.document = {
   querySelectorAll: () => [],
   querySelector: (sel) => (sel === ".ui-shell" ? uiShell : null),
   createElement: () => makeEl("row"),
-  body: { dataset: { theme: "dark" }, style: {} },
+  body: {
+    dataset: { theme: "dark" },
+    // CSS 变量驱动字号系数（--name-size 等）：桩用普通对象模拟 setProperty
+    style: { setProperty(k, v) { this[k] = v; } },
+  },
 };
 
 globalThis.window = {
@@ -68,7 +74,7 @@ globalThis.window = {
           : ["张三", "李四", "王五", "赵六", "钱七", "孙八", "周九", "吴十"],
         excluded: [],
       }),
-    loadSettings: () => Promise.resolve({ theme: "dark", background: "" }),
+    loadSettings: () => Promise.resolve({ theme: "dark", fontScale: 1, background: "" }),
     saveSettings: () => Promise.resolve(),
     getAppDir: () => Promise.resolve(""),
     openAppDir: () => Promise.resolve(),

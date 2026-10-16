@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>方案 · 设置面板扩展：字体大小（fontScale）</title>
+<style>
+  :root {
+    --bg: #f4f6f9; --card: #ffffff; --ink: #1d2733; --dim: #5b6b7d;
+    --accent: #2f6fed; --accent-soft: rgba(47,111,237,.08);
+    --ok: #1a9e58; --warn: #c77d0a; --err: #c43d3d;
+    --line: #e3e8ef; --code-bg: #0f1722; --code-ink: #d7e3f0;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: "Segoe UI", "Microsoft YaHei", "PingFang SC", sans-serif;
+    background: var(--bg); color: var(--ink); padding: 28px 20px 60px; line-height: 1.65;
+  }
+  .wrap { max-width: 1000px; margin: 0 auto; }
+  header h1 { font-size: 24px; letter-spacing: 1px; }
+  header p { color: var(--dim); margin-top: 6px; font-size: 14px; }
+  .badge { display:inline-block; background: var(--accent-soft); color: var(--accent);
+    border-radius: 999px; padding: 2px 12px; font-size: 12px; margin-right: 8px; vertical-align: 3px; }
+  nav { display: flex; gap: 6px; margin: 22px 0 16px; border-bottom: 2px solid var(--line); flex-wrap: wrap; }
+  nav button {
+    border: none; background: none; padding: 10px 18px; font-size: 14px; cursor: pointer;
+    color: var(--dim); border-bottom: 3px solid transparent; margin-bottom: -2px; font-family: inherit;
+  }
+  nav button.active { color: var(--accent); border-bottom-color: var(--accent); font-weight: 600; }
+  section.tab { display: none; }
+  section.tab.active { display: block; animation: fade .18s ease; }
+  @keyframes fade { from { opacity: 0; transform: translateY(3px);} to { opacity: 1; transform: none;} }
+  .card {
+    background: var(--card); border: 1px solid var(--line); border-radius: 12px;
+    padding: 18px 20px; margin-bottom: 14px; box-shadow: 0 1px 3px rgba(15,23,34,.04);
+  }
+  .card h2 { font-size: 16px; margin-bottom: 10px; letter-spacing: .5px; }
+  .card h2 .no { color: var(--accent); margin-right: 6px; }
+  table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+  th, td { border: 1px solid var(--line); padding: 7px 10px; text-align: left; vertical-align: top; }
+  th { background: var(--accent-soft); font-weight: 600; white-space: nowrap; }
+  .ok { color: var(--ok); font-weight: 600; }
+  .warn { color: var(--warn); font-weight: 600; }
+  code { background: #eef2f7; border-radius: 4px; padding: 1px 6px; font-size: 12.5px;
+    font-family: Consolas, "Cascadia Mono", monospace; }
+  pre { background: var(--code-bg); color: var(--code-ink); border-radius: 8px;
+    padding: 12px 14px; overflow-x: auto; font-size: 12.5px; line-height: 1.55;
+    font-family: Consolas, "Cascadia Mono", monospace; margin-top: 8px; }
+  pre .c { color: #7d93ab; } pre .k { color: #7fc0ff; } pre .s { color: #b7e08a; }
+  /* 流程图 */
+  .flow { display: flex; flex-direction: column; gap: 0; margin: 6px 0; }
+  .fnode { background: var(--accent-soft); border: 1.5px solid var(--accent);
+    border-radius: 10px; padding: 8px 14px; font-size: 13.5px; max-width: 640px; }
+  .fnode small { color: var(--dim); display: block; font-size: 12px; }
+  .farrow { color: var(--accent); font-size: 15px; padding: 2px 0 2px 26px; line-height: 1.2; }
+  .fbranch { display: flex; gap: 12px; flex-wrap: wrap; }
+  .fbranch .fnode { flex: 1; min-width: 240px; }
+  .risk { border-left: 4px solid var(--warn); background: #fffaf1; }
+  .good  { border-left: 4px solid var(--ok);   background: #f4fbf7; }
+  ul li, ol li { margin: 4px 0 4px 20px; font-size: 14px; }
+  .tag { font-size: 11px; border-radius: 4px; padding: 1px 7px; vertical-align: 1px; margin-left: 6px; }
+  .tag.f { background:#eef2f7; color: var(--dim); }
+  footer { color: var(--dim); font-size: 12px; margin-top: 26px; text-align: center; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1><span class="badge">待审批</span>设置面板扩展：字体大小（fontScale）</h1>
+    <p>ChosenOne 天选之子 · 2026-10-16 · 设计树已按 grilling 全部定案（用户四问全选推荐），批准前不动代码</p>
+  </header>
+
+  <nav>
+    <button class="active" data-t="t1">① 目标与决策</button>
+    <button data-t="t2">② 架构设计</button>
+    <button data-t="t3">③ 实施步骤</button>
+    <button data-t="t4">④ 文件清单 · 风险与回滚</button>
+  </nav>
+
+  <!-- ================= Tab 1 ================= -->
+  <section id="t1" class="tab active">
+    <div class="card good">
+      <h2>目标</h2>
+      在<strong>现有设置面板</strong>（界面方案/主题/背景图片已存在）新增「字体大小」设置：
+      调节名单区（老虎机）名字字号，满足教室后排可读性诉求；拖动即时预览，重启后保留。
+    </div>
+    <div class="card">
+      <h2><span class="no">决策</span>grilling 定案（四问全按推荐）</h2>
+      <table>
+        <tr><th>决策点</th><th>定案</th><th>理由</th></tr>
+        <tr><td>Q1 范围</td><td class="ok">仅「字体大小」一项</td><td>最小变更；音效/动画时长是全新功能域，后续迭代</td></tr>
+        <tr><td>Q2 作用域</td><td class="ok">仅名单区字号（42/46 基准 + 超长名字 tier 同步 ×系数）</td><td>可读性诉求聚焦名单；不碰按钮/标题布局，塌缩风险最小</td></tr>
+        <tr><td>Q3 交互</td><td class="ok">滑条 0.8×~1.3×，步进 0.05，实时预览，显示「1.0×」</td><td>范围由行高/视口硬约束推得，两端留安全边际</td></tr>
+        <tr><td>Q4 持久化</td><td class="ok">settings.json 新字段 <code>fontScale</code>，全局一套系数</td><td>沿用现有机制；按方案各记一套会造成切方案字号突变</td></tr>
+      </table>
+    </div>
+    <div class="card">
+      <h2><span class="no">边界</span>字号系数如何守住动画契约</h2>
+      <ul>
+        <li>行高 80px、视口 240px、42 行条带、1.5s ease-out：<span class="ok">全部不动</span>。</li>
+        <li>CSS 基准 42px / 中央行 46px 改为变量 <code>--name-size</code> / <code>--name-size-center</code>，默认 42/46（系数 1 时与现状像素一致）。</li>
+        <li>JS tier 绝对值（30/24/20px）改为「基准值 × 系数」后取整，保持「超长名字必不溢出」约束同比成立。</li>
+        <li>最大视觉：中央行 46×1.3≈60px，hit-pop 放大 1.15 ≈ 69px &lt; 行高 80px，安全。</li>
+        <li>与窗口自适应 zoom（0.7~1.15）正交叠加：zoom=窗口自适应，fontScale=用户偏好；复合最大 ≈1.5×，属可读范围。</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h2><span class="no">术语</span>domain-modeling 收尾（批准后随实现落档）</h2>
+      <ul>
+        <li>CONTEXT.md 新增词条「<strong>字体大小（font scale）</strong>」：名单区字号缩放系数，范围 0.8~1.3，默认 1.0；作用于名字基准字号与超长名字自适应档位，独立于窗口等比缩放。</li>
+        <li>style.css 头部硬约束注释同步：「字级 42/46px 与 tier（30/24/20px）配合」→「基准字级 × fontScale」。</li>
+        <li>不立 ADR：改动可逆（旧配置缺字段=1.0）、无惊奇、权衡平凡，未达三条件。</li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- ================= Tab 2 ================= -->
+  <section id="t2" class="tab">
+    <div class="card">
+      <h2><span class="no">数据流</span>从拖动滑条到名单变字</h2>
+      <div class="flow">
+        <div class="fnode">设置面板滑条 <code>#fontScaleInput</code>（0.8~1.3 / 0.05）<small>input 事件 → 实时预览；change 事件 → 持久化</small></div>
+        <div class="farrow">▼</div>
+        <div class="fnode"><code>applyFontScale(s)</code>：clamp 到 [0.8, 1.3]<small>① body 设 CSS 变量 --name-size = 42×s、--name-size-center = 46×s<br>② 已填各行重跑 applyRowFont（tier 值 = 基准 30/24/20 × s 取整）</small></div>
+        <div class="farrow">▼</div>
+        <div class="fnode">渲染层<small>.slot-row { font-size: var(--name-size) } · .center { var(--name-size-center) }<br>行内 style 仅在超长名字时写入（与现状一致，系数 1 时像素不变）</small></div>
+        <div class="farrow">▼ change 时</div>
+        <div class="fnode">saveCurrentSettings({ fontScale }) → API.saveSettings → Rust save_settings → settings.json<small>启动：loadAndApplySettings 读 fontScale（缺失/非法 → 1.0）→ 同链路应用</small></div>
+      </div>
+    </div>
+    <div class="card">
+      <h2><span class="no">持久化</span>Rust Settings 扩展与归一化</h2>
+<pre><span class="c">// src-tauri/src/settings.rs</span>
+<span class="k">pub struct</span> Settings {
+    <span class="k">pub</span> theme: String,
+    <span class="k">pub</span> scheme: String,
+    <span class="s">#[serde(default = <span class="k">"default_font_scale"</span>)]</span>
+    <span class="k">pub</span> font_scale: f64,   <span class="c">// camelCase → fontScale</span>
+    <span class="k">pub</span> background: String,
+}
+<span class="c">// load_settings 归一化：非有限数 / 越界 → clamp 或回落 1.0（防手改 JSON 捣乱）</span></pre>
+      <ul>
+        <li>旧 settings.json 无此字段 → serde 默认 1.0，完全向后兼容。</li>
+        <li>浏览器预览（api.js mock）同步返回 <code>fontScale: 1</code>，降级分支不破。</li>
+        <li>测试：默认值 / 往返 / 旧格式缺字段 / 越界归一化，共 4 例并入现有 settings 测试。</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h2><span class="no">UI</span>设置面板新增字段（位于「主题」之后）</h2>
+      <table>
+        <tr><th>元素</th><th>规格</th></tr>
+        <tr><td>字段标签</td><td>字体大小（名单区）</td></tr>
+        <tr><td>控件</td><td><code>&lt;input type="range" min="0.8" max="1.3" step="0.05"&gt;</code> + 右侧值显示「1.0×」</td></tr>
+        <tr><td>预览</td><td>拖动中实时生效（input 事件）；仅 change 落盘，避免高频写 settings.json</td></tr>
+        <tr><td>样式</td><td>复用现有 .field / 面板风格，双方案（mist/chalk）自动适配</td></tr>
+      </table>
+    </div>
+  </section>
+
+  <!-- ================= Tab 3 ================= -->
+  <section id="t3" class="tab">
+    <div class="card">
+      <h2><span class="no">阶段</span>实施顺序（每阶段可独立验证）</h2>
+      <ol>
+        <li><strong>Rust 后端</strong>：<code>font_scale</code> 字段 + serde 默认 + load 归一化 + 4 例测试 → <code>cargo test</code> 全绿。</li>
+        <li><strong>CSS 变量化</strong>：:root 新增 <code>--name-size</code>/<code>--name-size-center</code>（42/46），.slot-row/.center 引用；头注释硬约束同步 → 渲染像素与现状一致（系数 1 恒等）。</li>
+        <li><strong>JS 逻辑</strong>：<code>applyFontScale()</code>、tier ×系数、行重刷、loadAndApplySettings 应用 → main.js 动画几何零改动。</li>
+        <li><strong>面板 UI + mock</strong>：index.html 滑条字段、api.js mock 返回 fontScale。</li>
+        <li><strong>验证</strong>：cargo test + verify-render/roll/roster 回归 + 新增 CDP 检查（拖滑条字号实时变 / clamp 边界 / mock 持久化 / 系数 1 与现状像素一致 / 动画契约不破）。</li>
+        <li><strong>文档</strong>：CONTEXT.md 词条 + 提交。</li>
+      </ol>
+    </div>
+    <div class="card">
+      <h2>目检清单（机械门禁全绿后请你确认）</h2>
+      <ul>
+        <li>拖滑条至 1.3×，名单即时变大；0.8× 即时变小；松手后关闭重开面板数值保留。</li>
+        <li>抽一次奖：滚动、停驻中央高亮、三行互异与之前无差异。</li>
+        <li>mist / chalk 两方案下滑条样式均正常。</li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- ================= Tab 4 ================= -->
+  <section id="t4" class="tab">
+    <div class="card">
+      <h2><span class="no">文件</span>涉及修改（7 处）</h2>
+      <table>
+        <tr><th>文件</th><th>改动</th><th>量级</th></tr>
+        <tr><td><code>src-tauri/src/settings.rs</code></td><td>font_scale 字段 + 归一化 + 测试</td><td>小</td></tr>
+        <tr><td><code>src/style.css</code></td><td>:root 两变量 + .slot-row/.center 引用 + 头注释</td><td>小</td></tr>
+        <tr><td><code>src/main.js</code></td><td>applyFontScale / tier ×系数 / 行重刷 / 滑条事件 / 启动应用</td><td>中</td></tr>
+        <tr><td><code>src/index.html</code></td><td>设置面板「字体大小」字段</td><td>小</td></tr>
+        <tr><td><code>src/api.js</code></td><td>mock loadSettings 增 fontScale: 1</td><td>极小</td></tr>
+        <tr><td><code>CONTEXT.md</code></td><td>新术语词条</td><td>极小</td></tr>
+        <tr><td>验证脚本</td><td>新增 CDP fontScale 检查（临时目录，不入库亦可）</td><td>小</td></tr>
+      </table>
+      <p style="color:var(--dim);font-size:13px;margin-top:8px">main.js 的动画几何常量（ROW_H / ROLL_* / 终点位移）零改动。</p>
+    </div>
+    <div class="card risk">
+      <h2>风险评估</h2>
+      <table>
+        <tr><th>风险</th><th>评级</th><th>缓解</th></tr>
+        <tr><td>超长名字（&gt;14 字）在 1.3× 下水平方向逼近 560px 视口宽</td><td class="warn">低</td><td>tier 同步缩放保持同比安全边际；<code>.slot-row</code> overflow:hidden 兜底，不破布局</td></tr>
+        <tr><td>fontScale 与窗口 zoom 复合放大（最大 ≈1.5×）</td><td class="warn">低</td><td>两者正交且各自有界；行高 80px 硬约束下视觉仍安全</td></tr>
+        <tr><td>手改 settings.json 写入非法值</td><td class="warn">低</td><td>load 侧归一化：非有限数/越界 → 1.0/clamp，前后端双保险</td></tr>
+        <tr><td>回归：verify-roll 等断言旧字号路径</td><td class="warn">低</td><td>默认系数 1 时所有像素值与现状恒等；回归必跑</td></tr>
+      </table>
+    </div>
+    <div class="card good">
+      <h2>回滚方案</h2>
+      <ul>
+        <li>代码层面：单次提交，<code>git revert</code> 即回滚，无接口破坏。</li>
+        <li>数据层面：settings.json 的 <code>fontScale</code> 字段向后兼容——旧版代码读到多余字段会忽略（serde 未开启 deny_unknown_fields），无需数据迁移。</li>
+      </ul>
+    </div>
+  </section>
+
+  <footer>ChosenOne · 方案审批流程产物 · 批准后按「阶段」落地，机械门禁 + 目检双确认后收工</footer>
+</div>
+<script>
+  const btns = document.querySelectorAll('nav button');
+  const tabs = document.querySelectorAll('section.tab');
+  btns.forEach(b => b.addEventListener('click', () => {
+    btns.forEach(x => x.classList.toggle('active', x === b));
+    tabs.forEach(x => x.classList.toggle('active', x.id === b.dataset.t));
+  }));
+</script>
+</body>
+</html>

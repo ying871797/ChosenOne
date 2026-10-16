@@ -32,6 +32,8 @@
   const panelCloseBtn = document.getElementById("panelCloseBtn");
   const bgInput = document.getElementById("bgInput");
   const openDirBtn = document.getElementById("openDirBtn");
+  const fontScaleInput = document.getElementById("fontScaleInput");
+  const fontScaleValue = document.getElementById("fontScaleValue");
   const segBtns = Array.from(document.querySelectorAll(".seg-btn[data-theme]"));
   const schemeSegBtns = Array.from(document.querySelectorAll(".seg-btn[data-scheme]"));
 
@@ -168,30 +170,102 @@
   }
 
   // ---------- 老虎机动画 ----------
-  const ROW_H = 80;          // 行高（与 CSS 一致）
   const ROLL_DURATION = 1500; // 总滚动时长 ms
   const CENTER = 1;          // 中央可见行索引（视口内中间那行的行位）
 
-  // 条带几何：视口高 240px = 3 行，行条带必须有足够高度保证整个
-  // 滚动过程视口始终被覆盖 —— 条带行数 = 滚动序列长度（42），
-  // 总高 3360px = 视口 240px + 最大位移 3120px（maxMid × 80）。
+  // 条带几何：视口 = 3 行，行条带必须有足够高度保证整个滚动过程视口
+  // 始终被覆盖 —— 条带行数 = 滚动序列长度（42），
+  // 总高 = 视口（3 × 行高）+ 最大位移（maxMid × 行高）；
+  // 行高随字号系数变化时两端同比，覆盖约束自动成立（42 = 终点索引 39 + 视口 3 行）。
   const ROLL_RANDOM_COUNT = 39;              // 随机段行数；收尾段 3 行 = [非目标, 目标, 非目标]
   const ROLL_ROWS = ROLL_RANDOM_COUNT + 3;   // 条带行数 = 序列长度（42 行）
 
+  // ---------- 名单区几何（行高 / 视口随字号系数增长） ----------
+  // 行高 = max(80, 46 × 0.88 × 1.32 × 系数)：46 为中央行基准字号，
+  // 0.88 为中文字形墨高比，1.32 让字形上下各留约 16% 行内余量。
+  // 系数 ≤1.5 时结果恒为 80px（与旧几何逐位一致）；2.5× 时为 134px。
+  const ROW_H_MIN = 80;
+  const ROW_H_PER_SCALE = 46 * 0.88 * 1.32; // ≈ 53.4
+  const VIEWPORT_ROWS = 3;                  // 视口固定 3 行
+  const DESIGN_CHROME_H = 260;              // 设计窗高中非名单区的部分（500 − 240）
+  let rowH = ROW_H_MIN;                     // 当前行高；由 applyFontScale 随系数更新
+
+  /** 行高：按字号系数增长，下限 80px（系数 ≤1.5 时与旧几何完全一致） */
+  function rowHeightFor(scale) {
+    return Math.max(ROW_H_MIN, Math.round(ROW_H_PER_SCALE * scale));
+  }
+
+  /** 视口高 = 3 × 行高 */
+  function viewportHeightFor(scale) {
+    return rowHeightFor(scale) * VIEWPORT_ROWS;
+  }
+
+  /** 设计窗高 = 非名单区高度 + 视口高（系数 1.0 时为 500px） */
+  function designHeightFor(scale) {
+    return DESIGN_CHROME_H + viewportHeightFor(scale);
+  }
+
+  // 字号系数（名单区）合法区间与默认值；上限 2.5× 由几何推得：
+  // 行高与视口随系数增长（见 rowHeightFor），2.5× 时中央行 115px、行高 134px、
+  // 设计窗高 662px；横向由视口宽 560px 兜底（实测典型名单 2.5× 下 483px）。
+  // hit-pop 的 scale(1.15) 连同行盒一起缩放，不额外占用行高。与 settings.json 的 fontScale 同步。
+  const FONT_SCALE_MIN = 0.8;
+  const FONT_SCALE_MAX = 2.5;
+  let fontScale = 1; // 当前系数；applyFontScale 归一化后写入
+
+  /** 归一化字号系数：非法值（NaN/Infinity/越界）回落默认或 clamp。 */
+  function clampFontScale(value) {
+    const n = Number(value);
+    if (!Number.isFinite(n)) return 1;
+    return Math.min(Math.max(n, FONT_SCALE_MIN), FONT_SCALE_MAX);
+  }
+
+  /** 系数读数文案：1 → "1.0×"，0.85 → "0.85×"。 */
+  function formatFontScale(s) {
+    return `${s.toFixed(2).replace(/0$/, "")}×`;
+  }
+
   // 超长名字自适应字号（可抽名宽度上限：视口最大宽 560px，中文一字 ≈ 字号 + 2px 字距）
+  // base = 档位基准字号（px），实际行内字号 = base × fontScale；
+  // base 0 = 不写行内样式，走 CSS 变量（--name-size / --name-size-center，已随系数联动）。
   const FONT_SIZE_TIERS = [
-    { maxLen: 8, size: "" },     // 默认字号（CSS：常行 42px / 中央行 46px）
-    { maxLen: 11, size: "30px" },
-    { maxLen: 14, size: "24px" },
-    { maxLen: Infinity, size: "20px" },
+    { maxLen: 8, base: 0 },       // 默认字号（CSS：常行 42px / 中央行 46px × 系数）
+    { maxLen: 11, base: 30 },
+    { maxLen: 14, base: 24 },
+    { maxLen: Infinity, base: 20 },
   ];
   function applyRowFont(row, name) {
     const len = String(name).length;
     let size = "";
     for (const t of FONT_SIZE_TIERS) {
-      if (len <= t.maxLen) { size = t.size; break; }
+      if (len <= t.maxLen) {
+        if (t.base) size = `${Math.round(t.base * fontScale)}px`;
+        break;
+      }
     }
     row.style.fontSize = size;
+  }
+
+  /**
+   * 应用名单区字号系数（设置面板「字体大小」）：
+   * ① 更新 body 上的 CSS 变量 --name-size（42×s）/ --name-size-center（46×s）；
+   * ② 更新行高/视口变量 --row-h / --viewport-h（≤1.5 恒为 80/240）并刷新当前行高；
+   * ③ 档位行内字号需重跑 applyRowFont 刷已填各行（空行不受影响）。
+   * 行高与位移同源（都用 rowH）：滚动始终对齐行边界，不会露白。
+   * @param {number} value 目标系数
+   * @returns {number} 归一化后的系数
+   */
+  function applyFontScale(value) {
+    const s = clampFontScale(value);
+    fontScale = s;
+    // 取整像素：避免 42×1.3=54.5999… 浮点噪声污染 CSS 值
+    document.body.style.setProperty("--name-size", `${Math.round(42 * s)}px`);
+    document.body.style.setProperty("--name-size-center", `${Math.round(46 * s)}px`);
+    rowH = rowHeightFor(s);
+    document.body.style.setProperty("--row-h", `${rowH}px`);
+    document.body.style.setProperty("--viewport-h", `${viewportHeightFor(s)}px`);
+    rows.forEach((row) => applyRowFont(row, row.textContent));
+    return s;
   }
 
   /**
@@ -214,7 +288,7 @@
 
   /**
    * 条带行静态填充：row[i] 永久对应 seq[i]，之后的滚动只滑动条带本身。
-   * 视口（3 行）在 translateY(-mid*80) 下依次展示 seq[mid..mid+2]，
+   * 视口（3 行）在 translateY(-mid × 行高) 下依次展示 seq[mid..mid+2]，
    * 终点 mid=maxMid 时中央行 = rows[maxMid+CENTER] = seq[maxMid+1] = target。
    */
   function fillReel(seq) {
@@ -225,9 +299,9 @@
     });
   }
 
-  /** 每帧只更新条带位移；行文本已由 fillReel 一次填好 */
+  /** 每帧只更新条带位移；行文本已由 fillReel 一次填好（位移与 CSS 行高同源 rowH） */
   function renderFrame(seq, mid) {
-    slotList.style.transform = `translateY(${-mid * ROW_H}px)`;
+    slotList.style.transform = `translateY(${-mid * rowH}px)`;
   }
 
   /**
@@ -341,7 +415,7 @@
   // ---------- 条带构建 ----------
   /**
    * 按滚动序列长度构建条带 DOM 行（行数 = 序列长度），
-   * 视口 240px 在滚动全程始终被条带覆盖，终点目标行恰好停在视口正中。
+   * 视口（3 × 行高）在滚动全程始终被条带覆盖，终点目标行恰好停在视口正中。
    */
   function buildSlotRows() {
     rows = [];
@@ -381,6 +455,19 @@
     await saveCurrentSettings({ scheme });
     clearNoticeStatus(OWNER_NOTICE_SETTINGS);
     refreshStatus();
+  }
+
+  /**
+   * 设置面板「字体大小」：应用系数并同步 currentSettings 与滑条读数。
+   * 不做 IO —— 拖动（input）只预览；松手（change）才由事件绑定处调用 saveCurrentSettings 落盘。
+   * @returns {number} 归一化后的系数
+   */
+  function setFontScale(value) {
+    const s = applyFontScale(value);
+    currentSettings.fontScale = s; // 预览值进入当前设置，后续任意字段保存都携带它，避免被旧值冲掉
+    fontScaleInput.value = String(s);
+    fontScaleValue.textContent = formatFontScale(s);
+    return s;
   }
 
   async function applyBackground(filename) {
@@ -434,7 +521,7 @@
     }
   }
 
-  let currentSettings = { theme: "dark", scheme: "mist", background: "" };
+  let currentSettings = { theme: "dark", scheme: "mist", fontScale: 1, background: "" };
   let settingsSaveTail = Promise.resolve();
   let settingsRevision = 0;
   let settingsLoadPatches = null;
@@ -486,6 +573,8 @@
       loadedSettings = {
         theme: loaded?.theme === "light" ? "light" : "dark",
         scheme: loaded?.scheme === "chalk" ? "chalk" : "mist",
+        // 后端已 clamp；此处对浏览器预览/异常载荷再兜一层（非数字 → 1.0）
+        fontScale: clampFontScale(typeof loaded?.fontScale === "number" ? loaded.fontScale : NaN),
         background: typeof loaded?.background === "string" ? loaded.background : "",
       };
     } catch (e) {
@@ -515,6 +604,10 @@
     segBtns.forEach((b) => b.classList.toggle("active", b.dataset.theme === currentSettings.theme));
     document.body.dataset.scheme = currentSettings.scheme;
     schemeSegBtns.forEach((b) => b.classList.toggle("active", b.dataset.scheme === currentSettings.scheme));
+    setFontScale(currentSettings.fontScale);
+    // 字号系数已确定：先按需把窗口加高（会触发 resize），再按新设计窗高重算 zoom
+    await fitWindowHeight();
+    applyLayoutScale();
     const newerBackgroundRequest =
       latestBackgroundRequest && latestBackgroundRequest.revision > backgroundLoadRevision
         ? latestBackgroundRequest
@@ -600,22 +693,53 @@
 
   // ---------- 响应式等比缩放 ----------
   // 整个 UI（老虎机/字号/按钮/间距）随窗口尺寸按 min(宽比, 高比) 等比 zoom 缩放。
-  // - 基准 = 窗口默认尺寸 800×500（与 tauri.conf.json 保持一致）；
+  // - 基准 = 设计尺寸 800 × 设计窗高（设计窗高随字号系数变化，见 designHeightFor）；
   // - 范围 0.7~1.15：上限封顶（全屏不会无脑放大），下限保险（min 窗口实际 ≥0.8）；
-  // - 仅渲染缩放：DOM 逻辑尺寸不变，动画几何（行高 80 / 视口 240 / 条带 42）零影响。
+  // - 仅渲染缩放：DOM 逻辑尺寸不变；动画几何由 rowH 驱动，与 zoom 无关。
   const SHELL = document.querySelector(".ui-shell");
   const DESIGN_WIDTH = 800;
-  const DESIGN_HEIGHT = 500;
   const SCALE_MIN = 0.7;
   const SCALE_MAX = 1.15;
 
   function applyLayoutScale() {
-    const scale = Math.min(window.innerWidth / DESIGN_WIDTH, window.innerHeight / DESIGN_HEIGHT);
+    const scale = Math.min(window.innerWidth / DESIGN_WIDTH, window.innerHeight / designHeightFor(fontScale));
     const clamped = Math.min(Math.max(scale, SCALE_MIN), SCALE_MAX);
     SHELL.style.zoom = String(clamped);
   }
 
   window.addEventListener("resize", applyLayoutScale);
+
+  // ---------- 窗口高度按字号系数适配 ----------
+  // 名单区变高后需要更高的窗口才装得下：松手（change）与启动时按需把主窗口
+  // 加高到「设计窗高」（宽度不动）。只增不减；仅当当前高度仍等于上次自动值时
+  // 才跟随缩小，避免与用户手动缩放窗口打架。浏览器预览（无 __TAURI__）直接跳过。
+  let lastAutoWindowHeight = 0;
+
+  async function fitWindowHeight() {
+    const tauriWindow = window.__TAURI__?.window;
+    if (!tauriWindow?.getCurrentWindow) return; // 浏览器预览：没有可调的窗口
+    const target = designHeightFor(fontScale);
+    try {
+      const appWindow = tauriWindow.getCurrentWindow();
+      const scale = await appWindow.scaleFactor();
+      const size = await appWindow.innerSize();
+      const currentHeight = size.height / scale;
+      const width = size.width / scale;
+      const taller = currentHeight < target;
+      const ours = lastAutoWindowHeight > 0 && Math.abs(currentHeight - lastAutoWindowHeight) < 1;
+      const followsShrink = ours && Math.abs(currentHeight - target) > 1;
+      if (!taller && !followsShrink) return; // 用户手动调过且已够高：不打扰
+      if (!tauriWindow.LogicalSize) {
+        console.warn("窗口 API 缺少 LogicalSize，跳过高调整");
+        return;
+      }
+      await appWindow.setSize(new tauriWindow.LogicalSize(width, target));
+      lastAutoWindowHeight = target;
+    } catch (e) {
+      // 窗口高度仅为观感优化：失败不影响名单区功能
+      console.warn("调整窗口高度失败", e);
+    }
+  }
 
   // ---------- 初始化 ----------
   async function init() {
@@ -706,6 +830,20 @@
   );
   schemeSegBtns.forEach((btn) =>
     btn.addEventListener("click", () => handleSettingAction(() => applyScheme(btn.dataset.scheme)))
+  );
+  // 字体大小：input 拖动只实时预览，change（松手）才写 settings.json
+  fontScaleInput.addEventListener("input", () => {
+    const s = setFontScale(fontScaleInput.value);
+    // 设置仍在加载时记录补丁：迟到的默认值不得覆盖用户预览（与 saveCurrentSettings 同机制）
+    if (settingsLoadPatches) settingsLoadPatches.fontScale = s;
+  });
+  fontScaleInput.addEventListener("change", () =>
+    handleSettingAction(async () => {
+      await saveCurrentSettings({ fontScale: currentSettings.fontScale });
+      // 名单区可能变高：先按需加高窗口，再按新设计窗高重算 zoom（窗口未变也要重算）
+      await fitWindowHeight();
+      applyLayoutScale();
+    })
   );
   bgInput.addEventListener("change", () =>
     handleSettingAction(() => applyBackground(bgInput.value.trim()))

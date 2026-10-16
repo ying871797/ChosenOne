@@ -122,8 +122,49 @@ async function main() {
     const rowsOk = data.rows === 42;
 
     if (vpWOk && vpHOk && centerOk && rowsOk) {
-      console.log(`PASS 视口宽=${data.vpW} 高=${data.vpH} 行数=${data.rows} 中心命中=${data.centerClass} 中央文本=${JSON.stringify(data.centerRowText)}`);
-      process.exitCode = 0;
+      // 字体大小系数：真 CSS 变量链（滑条 input → --name-size / --row-h / --viewport-h → computed/布局）
+      // 变量断言精确像素（zoom 无关）；computed 与矩形高度只用比值断言（窗口缩放下 zoom 会参与计算）。
+      const font = JSON.parse(await evaluate(`(() => {
+        const row = document.querySelector('.slot-row');
+        const vp = document.querySelector('.slot-viewport');
+        const input = document.getElementById('fontScaleInput');
+        const varOf = (n) => getComputedStyle(document.body).getPropertyValue(n).trim();
+        const before = varOf('--name-size');
+        const computedBefore = parseFloat(getComputedStyle(row).fontSize);
+        const vpHBefore = vp.getBoundingClientRect().height;
+        input.value = '2.5';
+        input.dispatchEvent(new Event('input', { bubbles: true }));
+        const after = varOf('--name-size');
+        const rowH = varOf('--row-h');
+        const viewportH = varOf('--viewport-h');
+        const computedAfter = parseFloat(getComputedStyle(row).fontSize);
+        const vpHAfter = vp.getBoundingClientRect().height;
+        const display = document.getElementById('fontScaleValue').textContent;
+        input.value = '1';
+        input.dispatchEvent(new Event('input', { bubbles: true }));
+        return JSON.stringify({ before, after, restored: varOf('--name-size'), rowH, viewportH, rowHRestored: varOf('--row-h'), computedBefore, computedAfter, vpHBefore, vpHAfter, display });
+      })()`));
+      // 变量链像素精确；computed 与矩形高度用比值断言抵消窗口 zoom（105/42 = 2.5、402/240 = 1.675）
+      const ratio = font.computedAfter / font.computedBefore;
+      const vpRatio = font.vpHAfter / font.vpHBefore;
+      const fontOk =
+        font.before === '42px' &&
+        font.after === '105px' &&
+        font.restored === '42px' &&
+        font.rowH === '134px' &&
+        font.viewportH === '402px' &&
+        font.rowHRestored === '80px' &&
+        Math.abs(ratio - 2.5) < 0.01 &&
+        Math.abs(vpRatio - 402 / 240) < 0.02 &&
+        font.display === '2.5×';
+
+      if (fontOk) {
+        console.log(`PASS 视口宽=${data.vpW} 高=${data.vpH} 行数=${data.rows} 中心命中=${data.centerClass} 中央文本=${JSON.stringify(data.centerRowText)} 字号链=${font.before}→${font.after}(${font.display}) 行高=${font.rowH} 视口=${font.viewportH} 矩形比=${vpRatio.toFixed(3)}`);
+        process.exitCode = 0;
+      } else {
+        console.log(`FAIL 字号链 ${JSON.stringify(font)} vpRatio=${vpRatio}（期望 42→105px 行高 134px 视口 402px 矩形比 1.675 恢复 42/80px 读数 2.5×）`);
+        process.exitCode = 1;
+      }
     } else {
       console.log(`FAIL 视口宽=${data.vpW}(${vpWOk ? 'OK' : '塌缩!'}) 高=${data.vpH} 行数=${data.rows} 中心命中=${data.centerClass}(${centerOk ? 'OK' : '未命中!'})`);
       process.exitCode = 1;

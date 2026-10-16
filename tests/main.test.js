@@ -50,12 +50,29 @@ class FakeClassList {
   }
 }
 
+/** 极简 style 桩：既支持属性赋值（element.style.transform = …），
+ *  也支持 CSS 变量读写（main.js 用 setProperty 写 --name-size / --row-h 等）。 */
+function makeStyle() {
+  const vars = new Map();
+  return {
+    setProperty(name, value) {
+      vars.set(name, String(value));
+    },
+    getPropertyValue(name) {
+      return vars.get(name) || "";
+    },
+    removeProperty(name) {
+      vars.delete(name);
+    },
+  };
+}
+
 function makeElement(id = "", dataset = {}) {
   const listeners = new Map();
   const element = {
     id,
     dataset,
-    style: {},
+    style: makeStyle(),
     className: "",
     textContent: "",
     value: "",
@@ -113,6 +130,8 @@ function createHarness({
     "panelCloseBtn",
     "bgInput",
     "openDirBtn",
+    "fontScaleInput",
+    "fontScaleValue",
   ];
   const elements = Object.fromEntries(ids.map((id) => [id, makeElement(id)]));
   const themeButtons = [
@@ -615,6 +634,7 @@ test("设置加载迟到不会覆盖初始化期间的用户操作或未修改�
   assert.deepEqual(harness.state.settings, {
     theme: "light",
     scheme: "chalk",
+    fontScale: 1,
     background: "old.png",
   });
 });
@@ -907,8 +927,8 @@ test("设置保存按调用顺序串行并在失败后继续", async () => {
       saves[0].reject(new Error("disk full"));
       await flushMicrotasks();
       assert.equal(saves.length, 2, "第一次失败后仍必须执行第二次保存");
-      assert.deepEqual(saves[0].settings, { theme: "light", scheme: "mist", background: "" });
-      assert.deepEqual(saves[1].settings, { theme: "light", scheme: "chalk", background: "" });
+      assert.deepEqual(saves[0].settings, { theme: "light", scheme: "mist", fontScale: 1, background: "" });
+      assert.deepEqual(saves[1].settings, { theme: "light", scheme: "chalk", fontScale: 1, background: "" });
       await assert.rejects(first, /disk full/);
       assert.equal(harness.elements.statusHint.textContent, "设置保存失败");
       saves[1].resolve();
@@ -924,4 +944,37 @@ test("设置保存按调用顺序串行并在失败后继续", async () => {
   });
 
   assert.deepEqual(unhandled, []);
+});
+
+test("字号系数随保存落盘且不被无关设置冲掉", async () => {
+  const harness = createHarness({
+    settings: { theme: "dark", scheme: "mist", fontScale: 0.85, background: "" },
+  });
+  await harness.ready();
+
+  // 加载即生效：0.85 → 42×0.85=35.7 取整 36px / 46×0.85=39.1 取整 39px；行高仍取下限 80px
+  assert.equal(harness.body.style.getPropertyValue("--name-size"), "36px");
+  assert.equal(harness.body.style.getPropertyValue("--name-size-center"), "39px");
+  assert.equal(harness.body.style.getPropertyValue("--row-h"), "80px");
+  assert.equal(harness.body.style.getPropertyValue("--viewport-h"), "240px");
+  assert.equal(harness.elements.fontScaleValue.textContent, "0.85×");
+
+  // 拖动（input）只预览：变量与读数即时变，但不落盘
+  harness.elements.fontScaleInput.value = "2.5";
+  harness.elements.fontScaleInput.dispatch("input");
+  assert.equal(harness.state.calls.saveSettings, 0, "预览阶段不得落盘");
+  assert.equal(harness.body.style.getPropertyValue("--name-size"), "105px");
+  assert.equal(harness.body.style.getPropertyValue("--row-h"), "134px");
+  assert.equal(harness.body.style.getPropertyValue("--viewport-h"), "402px");
+  assert.equal(harness.elements.fontScaleValue.textContent, "2.5×");
+
+  // 松手（change）才落盘，快照携带当前系数
+  await harness.elements.fontScaleInput.dispatch("change");
+  assert.equal(harness.state.calls.saveSettings, 1);
+  assert.equal(harness.state.settings.fontScale, 2.5);
+
+  // 之后任意其它字段保存都必须带走新系数（不得被旧值冲掉）
+  await harness.click("themeBtn");
+  assert.equal(harness.state.settings.theme, "light");
+  assert.equal(harness.state.settings.fontScale, 2.5, "无关字段保存不得冲掉字号系数");
 });

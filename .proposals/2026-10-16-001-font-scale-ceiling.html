@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>方案：名单区按需放大（字号上限 1.5× → 2.5×）</title>
+<style>
+  :root {
+    --bg: #0e1117;
+    --card: #161b24;
+    --card-2: #1c2230;
+    --ink: #e8edf5;
+    --ink-dim: #9aa7b8;
+    --line: #2a3242;
+    --accent: #f0c26a;
+    --ok: #4cc38a;
+    --warn: #e2b33c;
+    --bad: #e06c6c;
+    --info: #6aa9f0;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    padding: 0 0 64px;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: "Segoe UI", "Microsoft YaHei", "PingFang SC", system-ui, sans-serif;
+    line-height: 1.7;
+  }
+  header {
+    padding: 32px 28px 20px;
+    border-bottom: 1px solid var(--line);
+    background: linear-gradient(160deg, #131a26, #0e1117);
+  }
+  h1 { margin: 0 0 6px; font-size: 25px; letter-spacing: 0.5px; }
+  .meta { margin: 0; color: var(--ink-dim); font-size: 13.5px; }
+  .badge-pending {
+    display: inline-block; margin-left: 8px; padding: 2px 10px;
+    border: 1px solid var(--warn); color: var(--warn);
+    border-radius: 999px; font-size: 12px;
+  }
+  nav.tabs {
+    display: flex; flex-wrap: wrap; gap: 8px;
+    padding: 16px 28px; position: sticky; top: 0;
+    background: rgba(14, 17, 23, 0.96); border-bottom: 1px solid var(--line);
+    backdrop-filter: blur(6px); z-index: 9;
+  }
+  nav.tabs button {
+    padding: 7px 15px; font-size: 14px; cursor: pointer;
+    background: var(--card); color: var(--ink-dim);
+    border: 1px solid var(--line); border-radius: 999px;
+    font-family: inherit;
+  }
+  nav.tabs button[aria-selected="true"] {
+    background: var(--accent); color: #1a1408; border-color: var(--accent); font-weight: 700;
+  }
+  main { padding: 22px 28px 0; max-width: 1100px; }
+  section[hidden] { display: none; }
+  h2 { font-size: 19px; margin: 26px 0 10px; }
+  h2:first-child { margin-top: 4px; }
+  h3 { font-size: 15.5px; margin: 20px 0 8px; color: var(--accent); }
+  p, li { font-size: 14.5px; }
+  ul { padding-left: 22px; }
+  li { margin: 4px 0; }
+  code {
+    background: #0b0f16; border: 1px solid var(--line);
+    padding: 1px 6px; border-radius: 5px;
+    font-family: "Cascadia Code", Consolas, monospace; font-size: 13px;
+    color: #cfe4ff;
+  }
+  .card {
+    background: var(--card); border: 1px solid var(--line);
+    border-radius: 12px; padding: 16px 18px; margin: 14px 0;
+  }
+  .card.accent { border-left: 3px solid var(--accent); }
+  .card.info { border-left: 3px solid var(--info); }
+  .card.warn { border-left: 3px solid var(--warn); }
+  table { width: 100%; border-collapse: collapse; margin: 12px 0; font-size: 13.5px; }
+  th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { color: var(--ink-dim); font-weight: 600; background: var(--card-2); }
+  tr:last-child td { border-bottom: none; }
+  td.num { font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .ok { color: var(--ok); }
+  .warnc { color: var(--warn); }
+  .badc { color: var(--bad); }
+  .tag {
+    display: inline-block; padding: 1px 8px; border-radius: 5px;
+    font-size: 12px; border: 1px solid currentColor;
+  }
+  .flow { display: flex; flex-direction: column; gap: 8px; margin: 14px 0; }
+  .fnode {
+    background: var(--card-2); border: 1px solid var(--line);
+    border-radius: 10px; padding: 11px 14px; font-size: 13.5px;
+  }
+  .fnode strong { color: var(--accent); }
+  .fnode small { color: var(--ink-dim); display: block; margin-top: 3px; }
+  .arrow { text-align: center; color: var(--ink-dim); font-size: 15px; line-height: 1; }
+  .cols { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  @media (max-width: 760px) { .cols { grid-template-columns: 1fr; } }
+  .steps { counter-reset: s; }
+  .step {
+    background: var(--card); border: 1px solid var(--line); border-radius: 12px;
+    padding: 14px 18px 14px 58px; margin: 12px 0; position: relative;
+  }
+  .step::before {
+    counter-increment: s; content: counter(s);
+    position: absolute; left: 16px; top: 14px;
+    width: 28px; height: 28px; border-radius: 50%;
+    background: var(--accent); color: #1a1408;
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 700; font-size: 14px;
+  }
+  .step h4 { margin: 0 0 6px; font-size: 15px; }
+  .step ul { margin: 6px 0 0; }
+  footer { max-width: 1100px; margin: 32px 28px 0; color: var(--ink-dim); font-size: 13px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>名单区按需放大：字号上限 1.5× → 2.5×<span class="badge-pending">待审批 · 未动代码</span></h1>
+  <p class="meta">2026-10-16 · ChosenOne 天选之子 · 关联：设置面板「字体大小」（fontScale）</p>
+</header>
+
+<nav class="tabs" role="tablist">
+  <button role="tab" aria-selected="true" data-target="t1">目标与背景</button>
+  <button role="tab" aria-selected="false" data-target="t2">技术方案</button>
+  <button role="tab" aria-selected="false" data-target="t3">实施步骤</button>
+  <button role="tab" aria-selected="false" data-target="t4">涉及文件</button>
+  <button role="tab" aria-selected="false" data-target="t5">风险与回滚</button>
+</nav>
+
+<main>
+  <!-- ========== 1 目标与背景 ========== -->
+  <section id="t1">
+    <h2>目标</h2>
+    <div class="card accent">
+      <p><strong>把名单字号上限从 1.5×（中央行 69px）提到 2.5×（中央行 115px）</strong>，让远距离也能看清；同时保持既有动画观感，并保证 1.5× 及以下的现有画面逐位不变。</p>
+    </div>
+
+    <h2>已确认的前提</h2>
+    <ul>
+      <li><strong>不换滚动方向。</strong>横向与纵向的字号上限相同，真正瓶颈是视口宽 560px；横向还要重做方向、遮罩、停驻，并失去 3 名同屏。</li>
+      <li><strong>使用场景以笔记本窗口为主</strong>（你已选定），因此放大必须来自逻辑像素（行高/视口），而不是靠全屏缩放。</li>
+      <li><strong>动画契约不变</strong>：1.5s ease-out 减速停止、3 行视口、42 行条带、金色高亮、随机段不剧透、终点三行互异。</li>
+      <li><strong>向下兼容</strong>：已保存的 <code>fontScale</code>（如 1.3）观感与几何不变。</li>
+    </ul>
+
+    <h2>现状瓶颈（实测）</h2>
+    <table>
+      <tr><th>量</th><th class="num">数值</th><th>说明</th></tr>
+      <tr><td>视口逻辑宽</td><td class="num">560px</td><td>名字横向可用的全部宽度</td></tr>
+      <tr><td>行高</td><td class="num">80px</td><td>写死在 <code>.slot-row</code> 与 <code>ROW_H</code>，是当前字号上限的真因</td></tr>
+      <tr><td>中央行字号 @1.5×</td><td class="num">69px</td><td>字形约 61px，行内仍有余量</td></tr>
+      <tr><td>中央行字号 @2.5×</td><td class="num">115px</td><td>字形约 101px，<span class="badc">放不进 80px 行高</span></td></tr>
+      <tr><td>典型名单宽度 @2.5×</td><td class="num">483px</td><td>「10 李柳佳」105px 字号实测，横向尚有余量</td></tr>
+    </table>
+    <div class="card info">
+      <p>结论：<strong>横向宽度不是瓶颈（2.5× 仍有余量），行高才是。</strong>把行高与视口按系数放大，即可在不换方向、不重做动画的前提下把上限提上去。</p>
+    </div>
+  </section>
+
+  <!-- ========== 2 技术方案 ========== -->
+  <section id="t2" hidden>
+    <h2>核心思路：行高「按需长大」</h2>
+    <p>行高由字号系数推导，只在放不下时才增长，因此 <strong>1.5× 及以下与现状完全一致</strong>：</p>
+    <div class="card accent">
+      <p><code>rowH(s) = max(80, round(53.4 × s))</code></p>
+      <p style="color:var(--ink-dim);font-size:13.5px;margin:6px 0 0">
+        53.4 = 46（中央行基准）× 0.88（中文字形墨高比）× 1.32（上下各留约 16% 余量）。
+        当 s ≤ 1.5 时结果恒为 80px —— 与现状逐位相同。
+      </p>
+    </div>
+    <ul>
+      <li><strong>视口高</strong> = 3 × 行高（仍严格 3 行）。</li>
+      <li><strong>设计窗高</strong> = 260（标题/按钮/状态栏）+ 视口高；1.0× 时为 500px，与现状一致。</li>
+      <li><strong>动画位移</strong> = −mid × 行高；终点 = 39 × 行高。条带仍 42 行（39 + 3），行高变大时条带总高同比变大，视口全程被覆盖的约束自动成立。</li>
+      <li><strong>视觉缩放基准</strong>（<code>DESIGN_HEIGHT</code>）随系数变化，zoom 才能正确贴合窗口。</li>
+    </ul>
+
+    <h3>数值对照</h3>
+    <table>
+      <tr><th>系数</th><th class="num">中央行字号</th><th class="num">字形高</th><th class="num">行高</th><th class="num">视口高</th><th class="num">设计窗高</th><th>相对现状</th></tr>
+      <tr><td class="num">1.0×</td><td class="num">46px</td><td class="num">40px</td><td class="num">80px</td><td class="num">240px</td><td class="num">500px</td><td class="ok">完全不变</td></tr>
+      <tr><td class="num">1.3×</td><td class="num">60px</td><td class="num">53px</td><td class="num">80px</td><td class="num">240px</td><td class="num">500px</td><td class="ok">完全不变（你当前的值）</td></tr>
+      <tr><td class="num">1.5×</td><td class="num">69px</td><td class="num">61px</td><td class="num">80px</td><td class="num">240px</td><td class="num">500px</td><td class="ok">完全不变（现上限）</td></tr>
+      <tr><td class="num">1.8×</td><td class="num">83px</td><td class="num">73px</td><td class="num">96px</td><td class="num">288px</td><td class="num">548px</td><td class="warnc">窗口开始变高</td></tr>
+      <tr><td class="num">2.0×</td><td class="num">92px</td><td class="num">81px</td><td class="num">107px</td><td class="num">321px</td><td class="num">581px</td><td class="warnc">—</td></tr>
+      <tr><td class="num">2.5×</td><td class="num">115px</td><td class="num">101px</td><td class="num">134px</td><td class="num">402px</td><td class="num">662px</td><td class="warnc">新上限</td></tr>
+    </table>
+
+    <h2>交互时序</h2>
+    <div class="flow">
+      <div class="fnode"><strong>拖动滑条（input）</strong> → 归一化系数 → 写字号变量 + 行高/视口变量<small>实时预览；窗口暂不调整（底部可能临时超出可视区，松手即恢复）</small></div>
+      <div class="arrow">▼</div>
+      <div class="fnode"><strong>松手（change）</strong> → 落盘 settings.json → 需要时调整窗口高度<small>只增不减；若窗口高度仍等于上次自动值才收缩（避免与手动缩放打架）</small></div>
+      <div class="arrow">▼</div>
+      <div class="fnode"><strong>启动</strong> → 读 settings.json → 归一化系数 → 应用几何 → 必要时先调整窗口高度<small>browser mock 下不触发窗口 API</small></div>
+      <div class="arrow">▼</div>
+      <div class="fnode"><strong>抽奖</strong> → 用当前行高计算位移与终点<small>1.5s ease-out、3 行视口、终点三行互异等契约不变</small></div>
+    </div>
+
+    <h2>为什么不改横向滚动</h2>
+    <table>
+      <tr><th>对比项</th><th>纵向（本方案）</th><th>横向（不采用）</th></tr>
+      <tr><td>字号上限</td><td class="ok">约 2.5×（行高放开后由视口宽决定）</td><td class="warnc">约 2.5×（同为视口宽决定）</td></tr>
+      <tr><td>改动面</td><td class="ok">行高/视口/窗口随系数联动</td><td class="badc">方向、遮罩、停驻、终点语义全部重做</td></tr>
+      <tr><td>停驻可读性</td><td class="ok">3 名同屏，抽中行有上下对照</td><td class="warnc">通常只剩 1 名居中</td></tr>
+      <tr><td>中文阅读轴</td><td class="ok">纵向移动不打断横向阅读</td><td class="warnc">文字横穿阅读轴，两端被遮罩裁切</td></tr>
+    </table>
+  </section>
+
+  <!-- ========== 3 实施步骤 ========== -->
+  <section id="t3" hidden>
+    <div class="steps">
+      <div class="step">
+        <h4>阶段 1：放开上限（后端）</h4>
+        <ul>
+          <li><code>settings.rs</code>：<code>FONT_SCALE_MAX</code> 1.5 → 2.5，注释同步几何依据；测试改为「2.5 保留、3.0 归一到 2.5、0.5 归一到 0.8」。</li>
+          <li><code>tauri.conf.json</code>：<code>minHeight</code> 400 → 500（避免最小窗口下 zoom 触底导致内容裁切）。</li>
+        </ul>
+      </div>
+      <div class="step">
+        <h4>阶段 2：几何变量化（样式）</h4>
+        <ul>
+          <li><code>style.css</code>：新增 <code>--row-h</code>（默认 80px）与 <code>--viewport-h</code>（默认 240px），替换写死的 80/240；上下雾化遮罩高度改为随行高同比。</li>
+          <li>同步头部「硬约束」注释：行高不再是固定 80px，而是「随系数增长、下限 80px」。</li>
+        </ul>
+      </div>
+      <div class="step">
+        <h4>阶段 3：前端几何与窗口适配</h4>
+        <ul>
+          <li><code>main.js</code>：新增 <code>rowHeightFor(s)</code> / <code>viewportHeightFor(s)</code> / <code>designHeightFor(s)</code>；<code>ROW_H</code> 常量改为按当前系数取值（<code>renderFrame</code> 用动态值）。</li>
+          <li><code>applyFontScale</code> 同时写 <code>--row-h</code> / <code>--viewport-h</code>；<code>applyLayoutScale</code> 的 <code>DESIGN_HEIGHT</code> 改为动态。</li>
+          <li><code>change</code> 与 <code>init</code> 按需调整窗口高度（<code>window.__TAURI__.window</code> + <code>LogicalSize</code>），mock 环境直接跳过。</li>
+        </ul>
+      </div>
+      <div class="step">
+        <h4>阶段 4：滑条与文档</h4>
+        <ul>
+          <li><code>index.html</code>：滑条 <code>max</code> 1.5 → 2.5。</li>
+          <li><code>CONTEXT.md</code> / <code>README.md</code>：范围改 0.8~2.5，补「行高/视口随系数增长」的说明。</li>
+        </ul>
+      </div>
+      <div class="step">
+        <h4>阶段 5：验证（全绿后才请你目检）</h4>
+        <ul>
+          <li><code>verify-fontscale.js</code>：上限 2.5 → 105px/115px、档位 24×2.5=60px；新增几何断言（2.0× → 行高 107px / 视口 321px）。</li>
+          <li><code>verify-render.js</code>：真浏览器字号链 42px → 105px（比值 2.5）+ 视口高比值断言。</li>
+          <li><code>verify-roll.js</code> / <code>verify-roster.js</code>：系数 1 时行高仍 80px、终点仍 −3120px（回归兜底）。</li>
+          <li><code>cargo test</code>（39 + 新增）与真渲染裁切实测（2.5× 中央行 115px、字形 101px &lt; 行高 134px）。</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- ========== 4 涉及文件 ========== -->
+  <section id="t4" hidden>
+    <table>
+      <tr><th>文件</th><th>改动</th></tr>
+      <tr><td><code>src-tauri/src/settings.rs</code></td><td>上限 2.5、注释、边界测试</td></tr>
+      <tr><td><code>src-tauri/tauri.conf.json</code></td><td><code>minHeight</code> 400 → 500</td></tr>
+      <tr><td><code>src/style.css</code></td><td>新增 <code>--row-h</code> / <code>--viewport-h</code>，替换 80/240，遮罩同比，注释同步</td></tr>
+      <tr><td><code>src/main.js</code></td><td>行高公式、动态 <code>ROW_H</code>、几何变量写入、动态 <code>DESIGN_HEIGHT</code>、窗口高度适配</td></tr>
+      <tr><td><code>src/index.html</code></td><td>滑条 <code>max</code> 2.5</td></tr>
+      <tr><td><code>src/api.js</code></td><td>mock 路径不触碰窗口 API（保住浏览器预览降级分支）</td></tr>
+      <tr><td><code>scripts/verify-fontscale.js</code> · <code>verify-render.js</code> · <code>verify-roll.js</code> · <code>verify-roster.js</code></td><td>断言与桩同步更新</td></tr>
+      <tr><td><code>CONTEXT.md</code> · <code>README.md</code></td><td>范围与几何说明</td></tr>
+      <tr><td><code>.proposals/2026-10-16-001-font-scale-ceiling.html</code></td><td>本方案文档</td></tr>
+    </table>
+    <div class="card info">
+      <p>不改动：<code>api.js</code> 的双模式降级、<code>windows_subsystem</code> 属性、<code>.overlay[hidden]</code> 规则、主题/方案配色、条带 42 行与随机段不剧透逻辑。</p>
+    </div>
+  </section>
+
+  <!-- ========== 5 风险与回滚 ========== -->
+  <section id="t5" hidden>
+    <table>
+      <tr><th>风险</th><th>级别</th><th>缓解</th></tr>
+      <tr>
+        <td>动画位移与行高不一致（滚偏、露白）</td>
+        <td><span class="tag warnc">中</span></td>
+        <td>行高、视口、位移、终点全部由同一个 <code>rowHeightFor(s)</code> 推导；验证脚本断言终端位移与行位置；系数 1.5 及以下数值与现状逐位相同（回归兜底）</td>
+      </tr>
+      <tr>
+        <td>窗口自动调整打扰用户</td>
+        <td><span class="tag warnc">中</span></td>
+        <td>只在 change/启动时调整；只增不减，除非高度仍等于上次自动值；拖动过程不调整</td>
+      </tr>
+      <tr>
+        <td>拖动预览时内容临时超出窗口底部</td>
+        <td><span class="tag">低</span></td>
+        <td>松手后窗口回正；若体验不佳，可改为「预览只跟字号、几何在松手后一次性应用」</td>
+      </tr>
+      <tr>
+        <td>启动瞬间窗口高度跳变</td>
+        <td><span class="tag">低</span></td>
+        <td>init 中先定尺寸再渲染；若仍可见，可把启动尺寸移到 Rust setup 中预置</td>
+      </tr>
+      <tr>
+        <td>超长名字（&gt;14 字）在高系数下横向贴边</td>
+        <td><span class="tag">低</span></td>
+        <td>现有档位随系数同比缩放，性质与现状相同（<code>.slot-row</code> overflow 兜底不溢出）；如出现再单独优化档位边界</td>
+      </tr>
+      <tr>
+        <td>旧版读到 &gt;1.5 的系数</td>
+        <td><span class="tag ok">低</span></td>
+        <td>旧版 <code>clamp</code> 会归一到 1.5，不崩</td>
+      </tr>
+    </table>
+
+    <h2>回滚</h2>
+    <div class="card">
+      <p>改动集中在 8 个文件且均为常量/公式级：<code>git checkout -- &lt;文件&gt;</code> 即回退；本次改动会在 <code>feat/font-scale-ceiling</code> 分支提交，未合并前 <code>main</code> 不受影响。</p>
+    </div>
+
+    <h2>备选方案：固定基线（改动更小）</h2>
+    <table>
+      <tr><th>方案</th><th>行高/视口/窗高</th><th>上限</th><th>代价</th></tr>
+      <tr>
+        <td><strong>本方案（推荐）</strong></td>
+        <td class="num">随系数 80→134 / 240→402 / 500→662</td>
+        <td class="ok">2.5×（115px）</td>
+        <td>需动态几何与窗口适配</td>
+      </tr>
+      <tr>
+        <td>固定基线</td>
+        <td class="num">固定 120 / 360 / 620</td>
+        <td class="ok">2.5×（115px）</td>
+        <td>1.0×~1.5× 观感变「更空」，默认窗口更高；实现只需换常量</td>
+      </tr>
+    </table>
+
+    <div class="card warn">
+      <h3 style="margin-top:0">待你确认的两点</h3>
+      <ul>
+        <li><strong>上限取 2.5× 还是 3.0×？</strong>3.0× 需要行高 160px / 窗高 740px，且个别 7~8 字名字在默认档会横向贴边（需细化档位边界）。推荐先上 2.5×。</li>
+        <li><strong>采用推荐方案（动态几何），还是固定基线？</strong>推荐前者：不影响你现有的 1.3× 观感。</li>
+      </ul>
+    </div>
+  </section>
+</main>
+
+<footer>本文件为方案文档，未做任何代码改动；批准后再建分支实施。</footer>
+
+<script>
+  const tabs = [...document.querySelectorAll('nav.tabs button')];
+  tabs.forEach((btn) => {
+    btn.addEventListener('click', () => {
+      tabs.forEach((b) => b.setAttribute('aria-selected', String(b === btn)));
+      document.querySelectorAll('main > section').forEach((s) => {
+        s.hidden = s.id !== btn.dataset.target;
+      });
+      window.scrollTo({ top: 0 });
+    });
+  });
+</script>
+</body>
+</html>

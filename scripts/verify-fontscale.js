@@ -1,9 +1,9 @@
 /* 验证脚本：字体大小（fontScale）设置全链路（最小 DOM 桩 + 真实 src/main.js）。
  * 断言：
- *   1) 加载归一化：fontScale=99（越界）→ 1.5，CSS 变量/滑条/读数同步；
+ *   1) 加载归一化：fontScale=3.0（越界）→ 2.5，CSS 变量/行高/视口/滑条/读数同步；
  *   2) tier 档位 × 系数：抽取 12 字名 → 行内字号 = round(24 × s)；
  *   3) 实时预览：input 事件改 CSS 变量但不落盘，且已填行重刷；
- *   4) clamp 边界：0.1 → 0.8；系数 1.0 时 CSS 变量与基准像素恒等（42/46px）；
+ *   4) clamp 边界：0.1 → 0.8；系数 1.0 时 CSS 变量与基准像素恒等（42/46px、行高 80/视口 240）；
  *   5) 持久化：change 事件才调用 saveSettings，快照携带 fontScale。
  * 用法：node scripts/verify-fontscale.js
  */
@@ -67,7 +67,7 @@ globalThis.window = {
         excluded: [],
       }),
     // 故意给越界值：验证前端 clamp（后端 load 已 clamp，前端兜底同类逻辑）
-    loadSettings: () => Promise.resolve({ theme: "dark", fontScale: 99, background: "" }),
+    loadSettings: () => Promise.resolve({ theme: "dark", fontScale: 3.0, background: "" }),
     saveSettings: (s) => { savedSettings.push(s); return Promise.resolve(); },
     getAppDir: () => Promise.resolve(""),
     openAppDir: () => Promise.resolve(),
@@ -88,19 +88,21 @@ const bodyStyle = document.body.style;
 async function main() {
   await sleep(80); // 等 init（含 loadAndApplySettings）
 
-  // 1) 加载归一化：99 → 1.5；CSS 变量 / 滑条 / 读数三处同步
-  assert.strictEqual(bodyStyle.getPropertyValue("--name-size"), "63px", `99 应 clamp 到 1.5 → 63px，实际 ${bodyStyle.getPropertyValue("--name-size")}`);
-  assert.strictEqual(bodyStyle.getPropertyValue("--name-size-center"), "69px", `中央行应 69px，实际 ${bodyStyle.getPropertyValue("--name-size-center")}`);
-  assert.strictEqual(els.fontScaleInput.value, "1.5", `滑条应同步 1.5，实际 ${els.fontScaleInput.value}`);
-  assert.strictEqual(els.fontScaleValue.textContent, "1.5×", `读数应 1.5×，实际 ${els.fontScaleValue.textContent}`);
+  // 1) 加载归一化：3.0 → 2.5；CSS 变量 / 行高 / 视口 / 滑条 / 读数同步
+  assert.strictEqual(bodyStyle.getPropertyValue("--name-size"), "105px", `3.0 应 clamp 到 2.5 → 105px，实际 ${bodyStyle.getPropertyValue("--name-size")}`);
+  assert.strictEqual(bodyStyle.getPropertyValue("--name-size-center"), "115px", `中央行应 115px，实际 ${bodyStyle.getPropertyValue("--name-size-center")}`);
+  assert.strictEqual(bodyStyle.getPropertyValue("--row-h"), "134px", `2.5 行高应 134px，实际 ${bodyStyle.getPropertyValue("--row-h")}`);
+  assert.strictEqual(bodyStyle.getPropertyValue("--viewport-h"), "402px", `2.5 视口应 402px，实际 ${bodyStyle.getPropertyValue("--viewport-h")}`);
+  assert.strictEqual(els.fontScaleInput.value, "2.5", `滑条应同步 2.5，实际 ${els.fontScaleInput.value}`);
+  assert.strictEqual(els.fontScaleValue.textContent, "2.5×", `读数应 2.5×，实际 ${els.fontScaleValue.textContent}`);
   assert.strictEqual(savedSettings.length, 0, "仅加载不落盘");
 
-  // 2) 抽取：12 字名 → tier base 24 × 1.5 → round(36) = 36px
+  // 2) 抽取：12 字名 → tier base 24 × 2.5 → round(60) = 60px
   els.drawBtn.dispatch("click");
   await sleep(1700);
   const hit = els.slotList.children.find((r) => r.classSet.has("hit"));
   assert(hit, "应有高亮行");
-  assert.strictEqual(hit.style.fontSize, "36px", `tier 应 24×1.5=36px，实际 ${hit.style.fontSize}`);
+  assert.strictEqual(hit.style.fontSize, "60px", `tier 应 24×2.5=60px，实际 ${hit.style.fontSize}`);
 
   // 3) 实时预览（input 不落盘）：0.1 → clamp 0.8，已填行同步重刷
   els.fontScaleInput.value = "0.1";
@@ -120,20 +122,32 @@ async function main() {
   assert.strictEqual(savedSettings[0].scheme, "mist", "快照应携带 scheme");
   assert.strictEqual(savedSettings[0].background, "", "快照应携带 background");
 
-  // 5) 系数 1.0 与基准像素恒等（回归不变量）
+  // 5) 系数 1.0 与基准像素恒等（回归不变量：行高/视口也回到 80/240）
   els.fontScaleInput.value = "1";
   els.fontScaleInput.dispatch("input");
   assert.strictEqual(bodyStyle.getPropertyValue("--name-size"), "42px", "1.0 应恒等 42px");
   assert.strictEqual(bodyStyle.getPropertyValue("--name-size-center"), "46px", "1.0 中央行应恒等 46px");
+  assert.strictEqual(bodyStyle.getPropertyValue("--row-h"), "80px", "1.0 行高应恒等 80px");
+  assert.strictEqual(bodyStyle.getPropertyValue("--viewport-h"), "240px", "1.0 视口应恒等 240px");
   assert.strictEqual(els.fontScaleValue.textContent, "1.0×", "读数应 1.0×");
   assert.strictEqual(hit.style.fontSize, "24px", `1.0 tier 应回 24px，实际 ${hit.style.fontSize}`);
   assert.strictEqual(savedSettings.length, 1, "1.0 预览仍不落盘");
 
-  // 6) 重置不因系数逻辑崩溃
+  // 6) 行高增长临界点：1.5× 仍为 80px（旧几何逐位不变），2.0× 起随系数增大
+  els.fontScaleInput.value = "1.5";
+  els.fontScaleInput.dispatch("input");
+  assert.strictEqual(bodyStyle.getPropertyValue("--row-h"), "80px", "1.5 行高应仍为 80px（旧几何不变）");
+  assert.strictEqual(bodyStyle.getPropertyValue("--viewport-h"), "240px", "1.5 视口应仍为 240px");
+  els.fontScaleInput.value = "2";
+  els.fontScaleInput.dispatch("input");
+  assert.strictEqual(bodyStyle.getPropertyValue("--row-h"), "107px", `2.0 行高应 107px，实际 ${bodyStyle.getPropertyValue("--row-h")}`);
+  assert.strictEqual(bodyStyle.getPropertyValue("--viewport-h"), "321px", `2.0 视口应 321px，实际 ${bodyStyle.getPropertyValue("--viewport-h")}`);
+
+  // 7) 重置不因系数逻辑崩溃
   els.resetBtn.dispatch("click");
   assert.strictEqual(els.slotList.style.transform, "translateY(0px)", "重置位移归 0");
 
-  console.log("PASS 加载clamp=1.5 变量=63/69px tier=36px 预览=34px(19px) 落盘=0.8×1次 恒等=42/46px");
+  console.log("PASS 加载clamp=2.5 变量=105/115px 行高=134 视口=402 tier=60px 预览=34px(19px) 恒等=42/46+80/240 临界=1.5/80 2.0/107");
 }
 
 main().catch((e) => {

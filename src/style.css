@@ -5,10 +5,11 @@
  * 渲染纪律（本次改动核心）：
  *   - 不使用 mix-blend-mode 全屏覆盖层、不使用 SVG data-URI 背景，
  *     背景全为纯 CSS 渐变 —— 规避 WebView2 下覆盖层渲染异常导致内容被罩住。
- * 硬约束（勿动）：.slot-row 行高 80px；视口高 240px；条带 42 行由
+ * 硬约束：.slot-row 行高默认 80px（= --row-h，随字号系数增长，下限 80）；
+ *   视口高 = 3 × 行高（--viewport-h，默认 240px）；条带 42 行由
  *   main.js 构建；.slot-row 必须 nowrap+overflow:hidden；字级基准
  *   42/46px（变量 --name-size / --name-size-center，×设置面板「字体大小」
- *   系数 fontScale 0.8~1.5）与 JS 自适应 tier（基准 30/24/20px 同步 ×系数）
+ *   系数 fontScale 0.8~2.5）与 JS 自适应 tier（基准 30/24/20px 同步 ×系数）
  *   配合；zoom 等比缩放作用于 .ui-shell。
  */
 
@@ -18,11 +19,14 @@
   --font-body: "Segoe UI", "Microsoft YaHei", "PingFang SC", sans-serif;
   --radius: 18px;
 
-  /* ---------- 名单区字级基准（× 设置面板「字体大小」系数 fontScale 0.8~1.5） ----------
-   * main.js 在启动/拖动滑条时按系数更新这两个变量；系数 1.0 时像素与基准一致。
-   * 上限受硬约束：46×1.5 = 69px，字形高约 61px，仍留在 80px 行高内。 */
+  /* ---------- 名单区字级与行高基准（× 设置面板「字体大小」系数 fontScale 0.8~2.5） ----------
+   * main.js 在启动/拖动滑条时按系数更新这四个变量；系数 1.0 时像素与基准一致。
+   * 行高按系数增长（≤1.5 恒为 80px）：46×2.5 = 115px 字形约 101px，
+   * 需 134px 行高才装得下，故 --row-h / --viewport-h 随之放大。 */
   --name-size: 42px;
   --name-size-center: 46px;
+  --row-h: 80px;
+  --viewport-h: 240px;
 
   /* ---------- dark：夜林晨雾（默认） ---------- */
   --bg: #1c2620;
@@ -387,12 +391,13 @@ body[data-scheme="chalk"][data-theme="light"] .bg-fx .dust {
     inset 0 1px 0 rgba(255, 255, 255, 0.08);
 }
 
-/* 名单窗口：3 行 × 80px = 240px（高度勿动） */
+/* 名单窗口：默认 3 行 × 80px = 240px；行高/视口高由 main.js 按字号系数写入
+ * （--row-h / --viewport-h，系数 ≤1.5 恒为 80/240） */
 .slot-viewport {
   position: relative;
   width: 100%;
   max-width: 560px;
-  height: 240px;
+  height: var(--viewport-h, 240px);
   overflow: hidden;
   border-radius: 16px;
   background: linear-gradient(180deg, var(--fog-top), var(--fog-bottom));
@@ -406,7 +411,7 @@ body[data-scheme="chalk"][data-theme="light"] .bg-fx .dust {
 }
 
 .slot-row {
-  height: 80px; /* 与 main.js ROW_H 一致，勿动 */
+  height: var(--row-h, 80px); /* 与 main.js rowHeightFor 一致（默认 80px） */
   display: flex;
   align-items: center;
   justify-content: center;
@@ -426,12 +431,12 @@ body[data-scheme="chalk"][data-theme="light"] .bg-fx .dust {
   text-shadow: 0 0 26px var(--accent-soft);
 }
 
-/* 窗口上下边缘雾化遮罩 */
+/* 窗口上下边缘雾化遮罩（高度随行高同比，默认 46px = 80px × 0.575） */
 .slot-mask {
   position: absolute;
   left: 0;
   right: 0;
-  height: 46px;
+  height: calc(var(--row-h, 80px) * 0.575);
   pointer-events: none;
 }
 

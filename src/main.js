@@ -170,21 +170,47 @@
   }
 
   // ---------- 老虎机动画 ----------
-  const ROW_H = 80;          // 行高（与 CSS 一致）
   const ROLL_DURATION = 1500; // 总滚动时长 ms
   const CENTER = 1;          // 中央可见行索引（视口内中间那行的行位）
 
-  // 条带几何：视口高 240px = 3 行，行条带必须有足够高度保证整个
-  // 滚动过程视口始终被覆盖 —— 条带行数 = 滚动序列长度（42），
-  // 总高 3360px = 视口 240px + 最大位移 3120px（maxMid × 80）。
+  // 条带几何：视口 = 3 行，行条带必须有足够高度保证整个滚动过程视口
+  // 始终被覆盖 —— 条带行数 = 滚动序列长度（42），
+  // 总高 = 视口（3 × 行高）+ 最大位移（maxMid × 行高）；
+  // 行高随字号系数变化时两端同比，覆盖约束自动成立（42 = 终点索引 39 + 视口 3 行）。
   const ROLL_RANDOM_COUNT = 39;              // 随机段行数；收尾段 3 行 = [非目标, 目标, 非目标]
   const ROLL_ROWS = ROLL_RANDOM_COUNT + 3;   // 条带行数 = 序列长度（42 行）
 
-  // 字号系数（名单区）合法区间与默认值；上下限由行高 80px 硬约束推得：
-  // 46×1.5 = 69px，字形高约 61px，仍留在 80px 行高内；再大（如 3×）字形会被裁切。
+  // ---------- 名单区几何（行高 / 视口随字号系数增长） ----------
+  // 行高 = max(80, 46 × 0.88 × 1.32 × 系数)：46 为中央行基准字号，
+  // 0.88 为中文字形墨高比，1.32 让字形上下各留约 16% 行内余量。
+  // 系数 ≤1.5 时结果恒为 80px（与旧几何逐位一致）；2.5× 时为 134px。
+  const ROW_H_MIN = 80;
+  const ROW_H_PER_SCALE = 46 * 0.88 * 1.32; // ≈ 53.4
+  const VIEWPORT_ROWS = 3;                  // 视口固定 3 行
+  const DESIGN_CHROME_H = 260;              // 设计窗高中非名单区的部分（500 − 240）
+  let rowH = ROW_H_MIN;                     // 当前行高；由 applyFontScale 随系数更新
+
+  /** 行高：按字号系数增长，下限 80px（系数 ≤1.5 时与旧几何完全一致） */
+  function rowHeightFor(scale) {
+    return Math.max(ROW_H_MIN, Math.round(ROW_H_PER_SCALE * scale));
+  }
+
+  /** 视口高 = 3 × 行高 */
+  function viewportHeightFor(scale) {
+    return rowHeightFor(scale) * VIEWPORT_ROWS;
+  }
+
+  /** 设计窗高 = 非名单区高度 + 视口高（系数 1.0 时为 500px） */
+  function designHeightFor(scale) {
+    return DESIGN_CHROME_H + viewportHeightFor(scale);
+  }
+
+  // 字号系数（名单区）合法区间与默认值；上限 2.5× 由几何推得：
+  // 行高与视口随系数增长（见 rowHeightFor），2.5× 时中央行 115px、行高 134px、
+  // 设计窗高 662px；横向由视口宽 560px 兜底（实测典型名单 2.5× 下 483px）。
   // hit-pop 的 scale(1.15) 连同行盒一起缩放，不额外占用行高。与 settings.json 的 fontScale 同步。
   const FONT_SCALE_MIN = 0.8;
-  const FONT_SCALE_MAX = 1.5;
+  const FONT_SCALE_MAX = 2.5;
   let fontScale = 1; // 当前系数；applyFontScale 归一化后写入
 
   /** 归一化字号系数：非法值（NaN/Infinity/越界）回落默认或 clamp。 */
@@ -223,8 +249,9 @@
   /**
    * 应用名单区字号系数（设置面板「字体大小」）：
    * ① 更新 body 上的 CSS 变量 --name-size（42×s）/ --name-size-center（46×s）；
-   * ② 档位行内字号需重跑 applyRowFont 刷已填各行（空行不受影响）。
-   * 仅改字级：行高 80 / 视口 240 / 42 行条带 / 滚动动画几何零改动。
+   * ② 更新行高/视口变量 --row-h / --viewport-h（≤1.5 恒为 80/240）并刷新当前行高；
+   * ③ 档位行内字号需重跑 applyRowFont 刷已填各行（空行不受影响）。
+   * 行高与位移同源（都用 rowH）：滚动始终对齐行边界，不会露白。
    * @param {number} value 目标系数
    * @returns {number} 归一化后的系数
    */
@@ -234,6 +261,9 @@
     // 取整像素：避免 42×1.3=54.5999… 浮点噪声污染 CSS 值
     document.body.style.setProperty("--name-size", `${Math.round(42 * s)}px`);
     document.body.style.setProperty("--name-size-center", `${Math.round(46 * s)}px`);
+    rowH = rowHeightFor(s);
+    document.body.style.setProperty("--row-h", `${rowH}px`);
+    document.body.style.setProperty("--viewport-h", `${viewportHeightFor(s)}px`);
     rows.forEach((row) => applyRowFont(row, row.textContent));
     return s;
   }
@@ -258,7 +288,7 @@
 
   /**
    * 条带行静态填充：row[i] 永久对应 seq[i]，之后的滚动只滑动条带本身。
-   * 视口（3 行）在 translateY(-mid*80) 下依次展示 seq[mid..mid+2]，
+   * 视口（3 行）在 translateY(-mid × 行高) 下依次展示 seq[mid..mid+2]，
    * 终点 mid=maxMid 时中央行 = rows[maxMid+CENTER] = seq[maxMid+1] = target。
    */
   function fillReel(seq) {
@@ -269,9 +299,9 @@
     });
   }
 
-  /** 每帧只更新条带位移；行文本已由 fillReel 一次填好 */
+  /** 每帧只更新条带位移；行文本已由 fillReel 一次填好（位移与 CSS 行高同源 rowH） */
   function renderFrame(seq, mid) {
-    slotList.style.transform = `translateY(${-mid * ROW_H}px)`;
+    slotList.style.transform = `translateY(${-mid * rowH}px)`;
   }
 
   /**
@@ -385,7 +415,7 @@
   // ---------- 条带构建 ----------
   /**
    * 按滚动序列长度构建条带 DOM 行（行数 = 序列长度），
-   * 视口 240px 在滚动全程始终被条带覆盖，终点目标行恰好停在视口正中。
+   * 视口（3 × 行高）在滚动全程始终被条带覆盖，终点目标行恰好停在视口正中。
    */
   function buildSlotRows() {
     rows = [];
@@ -575,6 +605,9 @@
     document.body.dataset.scheme = currentSettings.scheme;
     schemeSegBtns.forEach((b) => b.classList.toggle("active", b.dataset.scheme === currentSettings.scheme));
     setFontScale(currentSettings.fontScale);
+    // 字号系数已确定：先按需把窗口加高（会触发 resize），再按新设计窗高重算 zoom
+    await fitWindowHeight();
+    applyLayoutScale();
     const newerBackgroundRequest =
       latestBackgroundRequest && latestBackgroundRequest.revision > backgroundLoadRevision
         ? latestBackgroundRequest
@@ -660,22 +693,53 @@
 
   // ---------- 响应式等比缩放 ----------
   // 整个 UI（老虎机/字号/按钮/间距）随窗口尺寸按 min(宽比, 高比) 等比 zoom 缩放。
-  // - 基准 = 窗口默认尺寸 800×500（与 tauri.conf.json 保持一致）；
+  // - 基准 = 设计尺寸 800 × 设计窗高（设计窗高随字号系数变化，见 designHeightFor）；
   // - 范围 0.7~1.15：上限封顶（全屏不会无脑放大），下限保险（min 窗口实际 ≥0.8）；
-  // - 仅渲染缩放：DOM 逻辑尺寸不变，动画几何（行高 80 / 视口 240 / 条带 42）零影响。
+  // - 仅渲染缩放：DOM 逻辑尺寸不变；动画几何由 rowH 驱动，与 zoom 无关。
   const SHELL = document.querySelector(".ui-shell");
   const DESIGN_WIDTH = 800;
-  const DESIGN_HEIGHT = 500;
   const SCALE_MIN = 0.7;
   const SCALE_MAX = 1.15;
 
   function applyLayoutScale() {
-    const scale = Math.min(window.innerWidth / DESIGN_WIDTH, window.innerHeight / DESIGN_HEIGHT);
+    const scale = Math.min(window.innerWidth / DESIGN_WIDTH, window.innerHeight / designHeightFor(fontScale));
     const clamped = Math.min(Math.max(scale, SCALE_MIN), SCALE_MAX);
     SHELL.style.zoom = String(clamped);
   }
 
   window.addEventListener("resize", applyLayoutScale);
+
+  // ---------- 窗口高度按字号系数适配 ----------
+  // 名单区变高后需要更高的窗口才装得下：松手（change）与启动时按需把主窗口
+  // 加高到「设计窗高」（宽度不动）。只增不减；仅当当前高度仍等于上次自动值时
+  // 才跟随缩小，避免与用户手动缩放窗口打架。浏览器预览（无 __TAURI__）直接跳过。
+  let lastAutoWindowHeight = 0;
+
+  async function fitWindowHeight() {
+    const tauriWindow = window.__TAURI__?.window;
+    if (!tauriWindow?.getCurrentWindow) return; // 浏览器预览：没有可调的窗口
+    const target = designHeightFor(fontScale);
+    try {
+      const appWindow = tauriWindow.getCurrentWindow();
+      const scale = await appWindow.scaleFactor();
+      const size = await appWindow.innerSize();
+      const currentHeight = size.height / scale;
+      const width = size.width / scale;
+      const taller = currentHeight < target;
+      const ours = lastAutoWindowHeight > 0 && Math.abs(currentHeight - lastAutoWindowHeight) < 1;
+      const followsShrink = ours && Math.abs(currentHeight - target) > 1;
+      if (!taller && !followsShrink) return; // 用户手动调过且已够高：不打扰
+      if (!tauriWindow.LogicalSize) {
+        console.warn("窗口 API 缺少 LogicalSize，跳过高调整");
+        return;
+      }
+      await appWindow.setSize(new tauriWindow.LogicalSize(width, target));
+      lastAutoWindowHeight = target;
+    } catch (e) {
+      // 窗口高度仅为观感优化：失败不影响名单区功能
+      console.warn("调整窗口高度失败", e);
+    }
+  }
 
   // ---------- 初始化 ----------
   async function init() {
@@ -774,7 +838,12 @@
     if (settingsLoadPatches) settingsLoadPatches.fontScale = s;
   });
   fontScaleInput.addEventListener("change", () =>
-    handleSettingAction(() => saveCurrentSettings({ fontScale: currentSettings.fontScale }))
+    handleSettingAction(async () => {
+      await saveCurrentSettings({ fontScale: currentSettings.fontScale });
+      // 名单区可能变高：先按需加高窗口，再按新设计窗高重算 zoom（窗口未变也要重算）
+      await fitWindowHeight();
+      applyLayoutScale();
+    })
   );
   bgInput.addEventListener("change", () =>
     handleSettingAction(() => applyBackground(bgInput.value.trim()))

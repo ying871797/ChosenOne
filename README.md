@@ -1,6 +1,6 @@
-# 天选之子 · ChosenOne
+# ChosenOne · 点名器
 
-Windows 桌面点名器 —— 抽取时伴随老虎机式滚动动画，随机选中"天选之子"。
+Windows 桌面点名器 —— 抽取时伴随老虎机式滚动动画，随机选中一人。
 
 基于 **Tauri v2**（Rust 后端 + 纯 HTML/CSS/JS 前端，**无前端构建链**）。
 

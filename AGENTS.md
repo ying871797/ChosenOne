@@ -1,4 +1,4 @@
-# AGENTS.md — ChosenOne 天选之子
+# AGENTS.md — ChosenOne
 
 Windows 桌面点名器。Tauri v2（Rust 后端 + 纯 HTML/CSS/JS 前端，**无前端构建链**）。
 

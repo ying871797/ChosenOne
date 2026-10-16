@@ -79,8 +79,8 @@ async function main() {
 
   // 3) 终点：居中行 = 状态栏目标，带高亮
   const status = els.statusHint.textContent;
-  const target = /天选之子：(.+)$/.exec(status);
-  assert(target, `状态栏应有天选之子，实际 "${status}"`);
+  const target = /^🏆 (.+)$/.exec(status);
+  assert(target, `状态栏应显示抽取结果（🏆 名字），实际 "${status}"`);
   const centered = visibleRows().find(r => r.top <= 80 && r.top + 80 > 80);
   assert(centered, "终点应有屏幕正中行");
   assert.strictEqual(centered.text, target[1], `正中行应=目标 ${target[1]}，实际 ${centered.text}`);

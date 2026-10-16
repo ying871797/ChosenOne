@@ -1,7 +1,7 @@
 [package]
 name = "chosenone"
 version = "0.1.0"
-description = "天选之子 — 桌面点名器"
+description = "桌面点名器"
 edition = "2021"
 rust-version = "1.77.2"
 

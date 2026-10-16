@@ -142,8 +142,8 @@ async function main() {
   const endVis = visibleRows();
   assert.strictEqual(endVis.length, 3, `终点视口应恰好 3 行，实际 ${JSON.stringify(endVis)}`);
   const status = els.statusHint.textContent;
-  const target = /天选之子：(.+)$/.exec(status);
-  assert(target, `状态栏应显示天选之子，实际 "${status}"`);
+  const target = /^🏆 (.+)$/.exec(status);
+  assert(target, `状态栏应显示抽取结果（🏆 名字），实际 "${status}"`);
   const t = target[1];
   const centered = centerRow(endVis);
   assert(centered, `终点应有屏幕正中行 ${JSON.stringify(endVis)}`);

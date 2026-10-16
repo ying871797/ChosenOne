@@ -12,7 +12,7 @@
     "withGlobalTauri": true,
     "windows": [
       {
-        "title": "天选之子",
+        "title": "点名器",
         "width": 800,
         "height": 500,
         "minWidth": 640,

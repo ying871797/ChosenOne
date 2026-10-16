@@ -18,15 +18,14 @@ Windows 桌面点名器 —— 抽取时伴随老虎机式滚动动画，随机�
 
 | 分支 | 内容 |
 |---|---|
-| `master` | 文档：`CONTEXT.md`（领域词汇）、`docs/adr/`（架构决策）、`docs/superpowers/specs/`（实现规格） |
-| `feat/chosenone` | **应用源码**：`src/` 前端 + `src-tauri/` Rust 后端，已配置独立 worktree 开发 |
+| `master` | **单一主分支**：文档（`CONTEXT.md`、`docs/adr/`、`docs/superpowers/specs/`）与完整源码（`src/` 前端 + `src-tauri/` Rust 后端）同在此分支 |
+| `feat/*` | 功能分支，从 master 拉出；完成后 `git merge --no-ff` 回 master 并删除该分支 |
+
+> `.worktrees/` 已弃用（仍保留在 `.gitignore` 中），默认直接在仓库根开发。
 
 ## 快速开始
 
 ```bash
-# 检出应用分支
-git checkout feat/chosenone
-
 # 安装依赖（仅 @tauri-apps/cli）
 npm install
 

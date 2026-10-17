@@ -7,6 +7,8 @@ use std::path::Path;
 /// 上限由几何决定：行高与视口随系数增长（见前端 rowHeightFor），
 /// 3.2× 时中央行字号 147px、字形约 129px、行高 171px、视口 513px、
 /// 设计窗高 648px；横向可用宽度 = 视口宽（随窗口宽变化，800 宽窗口下 778px）。
+/// ⚠️ 与前端 `src/main.js` 的 `FONT_SCALE_MIN` / `FONT_SCALE_MAX` 必须保持一致（无构建链，无法共享常量）：
+/// 后端负责落盘归一化，前端负责浏览器预览与异常载荷的二次兜底。
 pub const FONT_SCALE_MIN: f64 = 0.8;
 pub const FONT_SCALE_MAX: f64 = 3.2;
 const FONT_SCALE_DEFAULT: f64 = 1.0;

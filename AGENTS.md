@@ -24,7 +24,7 @@ npm run tauri dev     # 开发模式（beforeDevCommand 为空，直接加载 sr
 npm run tauri build   # 打包 NSIS 每用户安装器
 npx tauri build --no-bundle  # 便携版自包含 exe → src-tauri/target/release/chosenone.exe
 
-npm test              # 前端逻辑测试（node --test，tests/main.test.js）
+npm test              # 前端逻辑测试（node --test，tests/main.test.js + tests/api.test.js）
 node scripts/verify-fontscale.js  # 字号系数全链路（CSS 变量/行高/视口/档位/落盘）
 node scripts/verify-roll.js       # 老虎机滚动几何（加 --long 跑长名退化路径）
 node scripts/verify-roster.js     # 名单解析/排除/统计链路（用真实 api.js mock）

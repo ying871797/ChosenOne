@@ -14,9 +14,9 @@
       {
         "title": "点名器",
         "width": 800,
-        "height": 500,
+        "height": 375,
         "minWidth": 640,
-        "minHeight": 500,
+        "minHeight": 375,
         "resizable": true,
         "center": true
       }

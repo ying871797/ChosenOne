@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>方案 003 · 紧凑化分支的审查修复</title>
+<style>
+  :root{
+    --bg:#eef1f4; --card:#fff; --ink:#1b242c; --dim:#5b6a77; --line:#dbe2e8;
+    --brand:#1f6b4f; --brand-soft:#e6f2ec; --warn:#b4712f; --warn-soft:#fbeade;
+    --err:#b4432b; --err-soft:#fbe9e4; --info:#2b5fa8; --info-soft:#e7effb;
+    --mono:"Cascadia Mono",Consolas,"Courier New",monospace;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.68 "Segoe UI","Microsoft YaHei",sans-serif}
+  .wrap{max-width:1120px;margin:0 auto;padding:26px 18px 64px}
+  header h1{font-size:23px;margin:0 0 6px}
+  header .meta{color:var(--dim);font-size:13.5px}
+  header .meta b{color:var(--ink)}
+  .badges{margin:14px 0 18px;display:flex;gap:8px;flex-wrap:wrap}
+  .badge{font-size:12.5px;font-weight:700;padding:3px 10px;border-radius:999px;background:#e3e8ed;color:#41525f}
+  .badge.ok{background:var(--brand-soft);color:var(--brand)}
+  .badge.warn{background:var(--warn-soft);color:var(--warn)}
+  .badge.err{background:var(--err-soft);color:var(--err)}
+  .badge.info{background:var(--info-soft);color:var(--info)}
+  .tabs{display:flex;gap:4px;flex-wrap:wrap;border-bottom:2px solid var(--line);margin-bottom:0}
+  .tabs button{appearance:none;border:0;background:transparent;font:inherit;font-size:14.5px;font-weight:600;color:var(--dim);padding:9px 15px;border-radius:10px 10px 0 0;cursor:pointer}
+  .tabs button:hover{background:#e3e8ed}
+  .tabs button[aria-selected="true"]{background:var(--card);color:var(--brand);box-shadow:inset 0 -2px 0 var(--brand)}
+  .panel{background:var(--card);border:1px solid var(--line);border-top:0;border-radius:0 0 14px 14px;padding:22px 22px 26px}
+  .panel[hidden]{display:none}
+  h2{font-size:17px;margin:0 0 10px}
+  h3{font-size:15px;margin:22px 0 8px;padding-left:10px;border-left:4px solid var(--brand)}
+  p{margin:8px 0}
+  ul{margin:8px 0 8px 20px;padding:0}
+  li{margin:4px 0}
+  table{width:100%;border-collapse:collapse;margin:12px 0;font-size:13.5px}
+  th,td{padding:8px 10px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
+  th{background:#f5f8fa;font-size:12.5px;color:var(--dim);font-weight:600}
+  td.n{font-family:var(--mono);text-align:right;white-space:nowrap}
+  tr.pick{background:var(--brand-soft)}
+  code{font-family:var(--mono);font-size:12.5px;background:#f1f4f6;padding:1px 5px;border-radius:5px}
+  pre{font-family:var(--mono);font-size:12.5px;background:#f7f9fb;border:1px solid var(--line);border-radius:9px;padding:12px 14px;overflow:auto;margin:12px 0}
+  pre .add{color:#1f6b4f;font-weight:600}
+  pre .del{color:#b4432b}
+  pre .cmt{color:#7a8794}
+  .note{border-left:4px solid var(--warn);background:var(--warn-soft);border-radius:9px;padding:11px 14px;margin:14px 0;font-size:13.5px}
+  .note.err{border-color:var(--err);background:var(--err-soft)}
+  .note.ok{border-color:var(--brand);background:var(--brand-soft)}
+  .note.info{border-color:var(--info);background:var(--info-soft)}
+  .flow{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:14px 0;font-size:13px}
+  .node{border:1.5px solid #c6d2da;border-radius:10px;padding:9px 12px;background:#f8fafb;text-align:center}
+  .node.hi{border-color:var(--brand);background:var(--brand-soft);color:var(--brand);font-weight:600}
+  .node.warn{border-color:var(--warn);background:var(--warn-soft);color:var(--warn)}
+  .node.err{border-color:var(--err);background:var(--err-soft);color:var(--err)}
+  .arrow{color:var(--dim);font-weight:700}
+  .filelist{font-family:var(--mono);font-size:12.5px;list-style:none;margin:8px 0;padding:0}
+  .filelist li{padding:5px 0;border-bottom:1px dashed var(--line)}
+  .filelist li span{color:var(--dim);font-family:"Segoe UI","Microsoft YaHei",sans-serif}
+  .shots figure{margin:0 0 12px}
+  .shots img{width:100%;max-width:420px;border:1px solid var(--line);border-radius:9px;display:block}
+  .shots figcaption{color:var(--dim);font-size:12.5px;margin-top:6px}
+  .grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:14px}
+  .kpi{display:flex;gap:10px;flex-wrap:wrap;margin:10px 0}
+  .kpi div{border:1px solid var(--line);border-radius:10px;padding:9px 13px;background:#fbfcfd;font-size:13px}
+  .kpi b{font-family:var(--mono);font-size:15px}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header>
+  <h1>方案 003 · 紧凑化分支的审查修复</h1>
+  <div class="meta">
+    日期 <b>2026-10-17</b> ｜ 分支 <b>feat/compact-layout</b>（HEAD <b>40afdef</b>，未合并）｜ 状态 <b>待你批准</b>
+  </div>
+  <div class="badges">
+    <span class="badge err">必修 1 项</span>
+    <span class="badge warn">建议 3 项</span>
+    <span class="badge info">参考 3 项</span>
+    <span class="badge ok">修复方案已在真实浏览器预验证</span>
+    <span class="badge">改动面：3 源码 + 1 测试 + 1 门禁 + 1 文档</span>
+  </div>
+  <p style="color:var(--dim);font-size:13.5px;margin:0">
+    本方案只处理「003 代码审查」列出的问题，<b>不改窗口宽度</b>（那是另一份待批准的 <code>002-窄窗口</code> 提案）。
+  </p>
+</header>
+
+<div class="tabs" role="tablist">
+  <button role="tab" aria-selected="true" data-t="t1">① 目标与背景</button>
+  <button role="tab" aria-selected="false" data-t="t2">② 技术设计</button>
+  <button role="tab" aria-selected="false" data-t="t3">③ 实施步骤</button>
+  <button role="tab" aria-selected="false" data-t="t4">④ 涉及文件</button>
+  <button role="tab" aria-selected="false" data-t="t5">⑤ 风险与回滚</button>
+  <button role="tab" aria-selected="false" data-t="t6">⑥ 建议不做（请你裁决）</button>
+</div>
+
+<section class="panel" id="t1">
+  <h2>① 目标与背景</h2>
+  <p><b>你的要求：</b>把「003 代码审查」里的修复项全部修掉。</p>
+  <p><b>背景：</b><code>feat/compact-layout</code> 把默认窗高从 500px 压到 375px，并新增「字体大小」字段，但没有同步处理设置面板的高度。结果：<b>默认状态下面板上下各被裁约 68px</b>——「设置」标题完全看不到，「关闭」按钮也不可见。</p>
+
+  <div class="kpi">
+    <div>面板高度 <b>511px</b></div>
+    <div>设计窗高 <b>375px</b></div>
+    <div>溢出 <b>136px</b></div>
+    <div>不可达控件 <b>2 个</b>（标题、关闭）</div>
+  </div>
+
+  <div class="shots">
+    <figure>
+      <img src="file:///C:/Users/ying8/AppData/Local/Temp/opencode/cn-panel-375.png" alt="默认窗口下的设置面板">
+      <figcaption>修复前实测（真实 Chrome，设计视口 800×375，zoom=1）：顶部标题被裁、底部「关闭」按钮不可见。<i>（临时截图路径，重装 Temp 后失效）</i></figcaption>
+    </figure>
+  </div>
+
+  <h3>为什么必须修</h3>
+  <ul>
+    <li>设置面板是「字体大小」功能的唯一入口，面板被裁直接影响本轮新功能可用性。</li>
+    <li>面板最窄情况下（最小窗口 640，zoom≈0.8）同样溢出，问题跨窗口尺寸存在。</li>
+    <li>在待批准的 <code>002-窄窗口</code> 方案里，1.75× 设计窗高为 414px，仍小于 511px——<b>不修这条，002 落地后依然是坏的</b>。</li>
+  </ul>
+
+  <div class="note err">
+    <b>已量化：</b>面板 511px（h2 41 + 字段 66/66/45/121 + 关闭钮 40 + 内边距 44 + 边框 2）。仅靠压缩间距无法降到 375px 以内（需减约 136px），因此<b>必须让面板可滚动</b>，而不是继续挤压留白。
+  </div>
+</section>
+
+<section class="panel" id="t2" hidden>
+  <h2>② 技术选型与架构设计</h2>
+
+  <h3>必修项：让设置面板在超高时可滚动</h3>
+  <p>采用的 CSS（<b>已在真实 Chrome 注入预验证</b>，见下表实测）：</p>
+<pre><span class="cmt">/* src/style.css */</span>
+.overlay {
+  position: fixed;
+  inset: 0;
+  background: var(--overlay-bg);
+  display: flex;
+<span class="add">+ overflow-y: auto;            /* 内容高于视口时可滚动 */</span>
+<span class="add">+ padding: 12px 0;             /* 贴边留呼吸，滚动时首尾都能看全 */</span>
+<span class="del">- align-items: center;</span>
+<span class="add">+ align-items: flex-start;     /* 超高时从顶部开始，两端都可滚到 */</span>
+<span class="del">- justify-content: center;</span>
+<span class="add">+ justify-content: flex-start;</span>
+  z-index: 10;
+}
+.overlay[hidden] { display: none; }   <span class="cmt">/* 保留，勿动 */</span>
+
+.panel {
+  ...
+<span class="add">+ margin: auto;                /* 能放下时居中；放不下时两端都可滚到 */</span>
+}
+</pre>
+
+  <div class="note info">
+    <b>为什么不用 <code>align-items:center</code> + <code>overflow</code>：</b>这是经典的 flex 居中陷阱——子元素比容器高时，居中会把「上溢」的部分推到滚动区之外，顶部永远滚不到。改用子元素 <code>margin:auto</code> 后，能放下时仍居中，放不下时自动退化为「顶部对齐 + 可滚到底」，两端都可达。
+  </div>
+
+  <h3>预验证实测（真实 Chrome，800×375）</h3>
+  <table>
+    <thead><tr><th>指标</th><th>修复前</th><th>注入候选修复后</th><th>期望</th></tr></thead>
+    <tbody>
+      <tr><td><code>.overlay</code> overflowY</td><td class="n">visible</td><td class="n">auto</td><td>auto</td></tr>
+      <tr><td>滚动高度 / 视口高度</td><td class="n">443 / 375</td><td class="n">535 / 375</td><td>可滚动</td></tr>
+      <tr><td>面板顶端（scrollTop=0）</td><td class="n">−68</td><td class="n">12</td><td>≥ 0 ✓</td></tr>
+      <tr class="pick"><td>「关闭」按钮可达</td><td class="n">否</td><td class="n">是（下边 342 ≤ 375）</td><td>可达 ✓</td></tr>
+      <tr><td>水平居中</td><td class="n">400</td><td class="n">393</td><td>居中（滚动条占 15px → 略偏左 7px）</td></tr>
+    </tbody>
+  </table>
+  <p style="color:var(--dim);font-size:13px">注：需要滚动时会出现滚动条，面板中心因此左移约 7px。属可接受的细微差异；如需完全对齐，可另加 <code>scrollbar-gutter: stable</code>（本方案不做，避免改变默认视觉）。</p>
+
+  <h3>配套：把两条几何不变量写进门禁</h3>
+  <p>这次必修项能漏到审查阶段，根因是 <code>verify-render.js</code> 没有覆盖它们。新增两条断言：</p>
+  <div class="flow">
+    <div class="node hi">注入 800×设计窗高</div><span class="arrow">→</span>
+    <div class="node">断言 innerH − 视口高 = <b>135</b>（DESIGN_CHROME_H）</div><span class="arrow">→</span>
+    <div class="node">打开设置面板</div><span class="arrow">→</span>
+    <div class="node hi">断言面板两端可达（可滚动或无需滚动）</div>
+  </div>
+  <p>面板可达性的断言写法（避免把「面板必须 ≤ 视口」写死，因为滚动是可接受解）：</p>
+<pre><span class="cmt">// 面板顶端可达 && 关闭按钮可达</span>
+const reachable =
+  (panelTop &gt;= 0 || scrollable) &amp;&amp; closeBtnBottom &lt;= innerHeight + 1;
+</pre>
+
+  <h3>建议项 1：加载设置期间的字号补丁不再被丢弃</h3>
+  <p>根因是 <code>input</code> 处理器只记了补丁、没有 bump <code>settingsRevision</code>，导致 <code>changedDuringLoad</code> 恒为 false，补丁在 <code>loadAndApplySettings</code> 中被丢弃。</p>
+<pre><span class="cmt">// src/main.js 字号 input 处理器</span>
+fontScaleInput.addEventListener("input", () =&gt; {
+  const s = setFontScale(fontScaleInput.value);
+<span class="del">-  if (settingsLoadPatches) settingsLoadPatches.fontScale = s;</span>
+<span class="add">+  if (settingsLoadPatches) {</span>
+<span class="add">+    settingsLoadPatches.fontScale = s;</span>
+<span class="add">+    settingsRevision += 1;   // 与 applyTheme/applyScheme 同机制：让「加载期用户操作」生效</span>
+<span class="add">+  }</span>
+});
+</pre>
+
+  <h3>建议项 2：保存失败时仍完成窗口适配</h3>
+<pre><span class="cmt">// src/main.js 字号 change 处理器</span>
+  handleSettingAction(async () =&gt; {
+<span class="del">-   await saveCurrentSettings({ fontScale: currentSettings.fontScale });</span>
+<span class="del">-   await fitWindowHeight();</span>
+<span class="del">-   applyLayoutScale();</span>
+<span class="add">+   try {</span>
+<span class="add">+     await saveCurrentSettings({ fontScale: currentSettings.fontScale });</span>
+<span class="add">+   } finally {</span>
+<span class="add">+     // 保存失败也要保证窗口高度与缩放与新字号一致（失败仍向上抛，状态照常提示）</span>
+<span class="add">+     await fitWindowHeight();</span>
+<span class="add">+     applyLayoutScale();</span>
+<span class="add">+   }</span>
+  })
+</pre>
+</section>
+
+<section class="panel" id="t3" hidden>
+  <h2>③ 具体实施步骤（分阶段，TDD）</h2>
+  <p>全部改动追加在现有 <code>feat/compact-layout</code> 分支上——回归是该分支引入的，修复与它同批合并，符合「分支未合并前继续在其上开发」。</p>
+
+  <div class="flow">
+    <div class="node">阶段 0<br>门禁断言先红</div><span class="arrow">→</span>
+    <div class="node hi">阶段 1<br>CSS 修复转绿</div><span class="arrow">→</span>
+    <div class="node">阶段 2<br>main.js 两处 + 单测</div><span class="arrow">→</span>
+    <div class="node">阶段 3<br>文档与注释</div><span class="arrow">→</span>
+    <div class="node hi">阶段 4<br>全量门禁</div><span class="arrow">→</span>
+    <div class="node">阶段 5<br>目检 + 合并</div>
+  </div>
+
+  <h3>阶段 0 · 先用门禁复现（红）</h3>
+  <ul>
+    <li>扩展 <code>scripts/verify-render.js</code>：新增「非名单区高度 = DESIGN_CHROME_H」「设置面板两端可达」两组断言。</li>
+    <li>运行 <code>node scripts/verify-render.js</code> → 预期 <b>FAIL</b>（证明断言真的能抓住这个 bug）。</li>
+  </ul>
+
+  <h3>阶段 1 · 修复面板（绿）</h3>
+  <ul>
+    <li>改 <code>src/style.css</code> 的 <code>.overlay</code> / <code>.panel</code>（见 ② 的 CSS）。</li>
+    <li>重跑 <code>verify-render.js</code> → 预期 <b>PASS</b>。</li>
+  </ul>
+
+  <h3>阶段 2 · main.js 两处修复 + 单测（先红后绿）</h3>
+  <ul>
+    <li>先在 <code>tests/main.test.js</code> 加测试：<b>「加载期间拖动字号滑条，迟到的加载值不覆盖预览且会补偿保存」</b>（用延迟 <code>loadSettings</code> 的 harness）→ 预期 <b>FAIL</b>。</li>
+    <li>改 <code>src/main.js</code> 的 <code>input</code> 处理器（bump settingsRevision）→ 该测试转 <b>PASS</b>。</li>
+    <li>改 <code>change</code> 处理器为 <code>try/finally</code>；加一条测试：保存失败时仍调用窗口适配（用桩断言 <code>fitWindowHeight</code> 的副作用或至少不抛后续错误）。</li>
+  </ul>
+
+  <h3>阶段 3 · 文档与注释</h3>
+  <ul>
+    <li><code>src/index.html</code>：给 <code>bgInput</code> / <code>fontScaleInput</code> 的 <code>&lt;label&gt;</code> 补 <code>for=</code>。</li>
+    <li><code>AGENTS.md</code>：<code>npm test</code> 说明补上 <code>tests/api.test.js</code>。</li>
+    <li><code>src/main.js</code> 与 <code>src-tauri/src/settings.rs</code>：字号上下限常量两侧加交叉引用注释。</li>
+    <li><code>CONTEXT.md</code>：在「设置面板」相关条目补一句「面板超高时在遮罩内滚动」。</li>
+  </ul>
+
+  <h3>阶段 4 · 全量门禁</h3>
+  <pre>npm test
+node scripts/verify-fontscale.js
+node scripts/verify-roll.js
+node scripts/verify-roster.js
+node scripts/verify-render.js
+cd src-tauri &amp;&amp; cargo test
+git diff --check</pre>
+
+  <h3>阶段 5 · 目检与合并</h3>
+  <ul>
+    <li>提交（建议 2~3 个提交：门禁+CSS / main.js+单测 / 文档）。</li>
+    <li><b>可选</b>：<code>npx tauri build --no-bundle</code> 重建便携版并替换桌面 <code>ChosenOne-便携版.exe</code>（前端资源嵌在 exe 里，不重建则不生效）。</li>
+    <li>你目检：打开设置面板确认标题可见、能滚到「关闭」；大字号下窗口自动加高。</li>
+    <li>你同意后：<code>git merge --no-ff feat/compact-layout</code> → <code>git push</code> → 删除分支。</li>
+  </ul>
+  <div class="note ok">
+    若阶段 5 你选择重建便携版，请注意：桌面那份 exe 旁边有你从「文档」复制来的名单，重建只替换 exe 本身，<b>不动 names.txt / excluded.txt</b>。
+  </div>
+</section>
+
+<section class="panel" id="t4" hidden>
+  <h2>④ 涉及修改的文件列表</h2>
+  <ul class="filelist">
+    <li>src/style.css <span>— .overlay / .panel 可滚动居中（必修）</span></li>
+    <li>src/main.js <span>— input 处理器 bump settingsRevision；change 处理器 try/finally；常量交叉注释</span></li>
+    <li>src/index.html <span>— 两处 &lt;label for=…&gt;</span></li>
+    <li>tests/main.test.js <span>— 新增 2 条测试（加载期字号补丁、保存失败仍适配窗口）</span></li>
+    <li>scripts/verify-render.js <span>— 新增 2 组断言（chrome=135、面板两端可达）</span></li>
+    <li>CONTEXT.md <span>— 面板可滚动一句</span></li>
+    <li>AGENTS.md <span>— npm test 说明补 api.test.js</span></li>
+    <li>src-tauri/src/settings.rs <span>— 仅注释（常量交叉引用）</span></li>
+    <li>.proposals/2026-10-17-003-compact-layout-fixes.html <span>— 本方案文档（新增）</span></li>
+  </ul>
+  <div class="note info">
+    <b>不需要动：</b>Rust 逻辑、Tauri 配置、<code>DESIGN_WIDTH</code>/<code>DESIGN_CHROME_H</code> 数值、<code>.proposals/</code> 历史文档、<code>docs/adr/</code>。
+  </div>
+</section>
+
+<section class="panel" id="t5" hidden>
+  <h2>⑤ 风险评估与回滚方案</h2>
+  <table>
+    <thead><tr><th>风险</th><th>概率</th><th>影响</th><th>对策</th></tr></thead>
+    <tbody>
+      <tr><td>面板滚动后视觉与旧版不同（出现滚动条）</td><td>高（预期内）</td><td>观感</td><td>已预验证；滚动条仅在高溢出的场景出现</td></tr>
+      <tr><td>面板居中因滚动条左移 7px</td><td>中</td><td>观察细节</td><td>可接受；必要时再评估 <code>scrollbar-gutter</code></td></tr>
+      <tr><td>门禁新断言与 002（窄窗口）改动冲突</td><td>低</td><td>CI 红</td><td>002 的文件清单已含 verify-render.js，落地时一并重锚</td></tr>
+      <tr><td>main.js 改动引入回归</td><td>低</td><td>设置链路</td><td>单测覆盖 + 全量门禁；改动仅 3 行逻辑</td></tr>
+      <tr><td>改 CSS 未重建 → 「改了没效果」</td><td>中</td><td>误导判断</td><td>阶段 5 明确「需重建便携版才生效」</td></tr>
+    </tbody>
+  </table>
+  <h3>回滚</h3>
+  <ul>
+    <li>改动全部集中在 2~3 个提交，且不涉及数据格式与 Rust 逻辑 → <code>git revert &lt;提交&gt;</code> 即可完全回退。</li>
+    <li>无数据库、无配置迁移、无破坏性操作；<code>settings.json</code> 结构不变。</li>
+    <li>合并前所有改动只存在于 <code>feat/compact-layout</code>，master 不受影响。</li>
+  </ul>
+</section>
+
+<section class="panel" id="t6" hidden>
+  <h2>⑥ 参考项里我建议不修的 3 条（请你裁决）</h2>
+  <p>你要求「修复项全部修复」。以下 3 条我判断<b>不宜在本轮做</b>，理由如下；若你仍要求做，请在批准时说明，我照做。</p>
+
+  <h3>1 <code>applyRowFonts</code> 拖动时的性能 —— 建议另开一轮</h3>
+  <p>实测（真实 Chrome，42 行填满，连续 20 次 <code>input</code>）：</p>
+  <div class="kpi">
+    <div>单次总耗时 <b>3.08ms</b></div>
+    <div>单次峰值 <b>4~6ms</b></div>
+    <div>帧预算 <b>16.7ms</b></div>
+  </div>
+  <p>即每次拖动约占一帧的 20%~35%，桌面端可接受。而两种改法都有代价：</p>
+  <ul>
+    <li><b>rAF 合并</b>：会让「拖动即改 CSS 变量」变成「下一帧才改」。现有 4 处断言（3 个脚本 + 单测）都是<b>同步</b>校验变量值，全部要改成异步等待——改动面反而大于问题本身。</li>
+    <li><b>只重排可见行</b>：需从 <code>slotList</code> 位移反推可见行区间；且 <code>finish()</code> 只重排命中行，静止时相邻两行可能残留旧档位 → 引入新的视觉缺陷。</li>
+  </ul>
+  <p>结论：<b>维持现状</b>，并把实测数字写进 <code>main.js</code> 注释备查。若将来在小屏/低端机上感到卡顿，再单独立项（届时同步把 4 处断言改为异步）。</p>
+
+  <h3>2 <code>fitWindowHeight</code> 的 <code>taller</code> 判断 —— 建议维持 + 补注释</h3>
+  <p>它只会在「启动」与「改字号」两个时机被调用，不会在用户拖拽窗口时打扰用户。若用户手动把窗口压得比设计窗高更低，<code>applyLayoutScale</code> 的 zoom 会等比缩小整个界面，内容本来就装得下。<b>维持现状</b>，仅补一句注释说明「非持续干预」。</p>
+
+  <h3>3 屏幕高度钳制（3.2× 时窗高 648px）—— 建议不做</h3>
+  <p>给窗口加高加「不超过屏幕工作区」的钳制属于<b>新功能</b>（要读显示器尺寸、要定义超出时的降级策略），超出本次审查范围。且 3.2× 是用户主动选择的极端档位。建议仅在本方案里记录，不实现。</p>
+
+  <div class="note warn">
+    <b>需要在批准时确认的 2 个点：</b>
+    <ol style="margin:6px 0 0 18px">
+      <li>上面 3 条是否同意「本轮不做」。</li>
+      <li>阶段 5 是否要<b>重建便携版</b>并替换桌面 exe（前端改动需重建才生效）。</li>
+    </ol>
+  </div>
+</section>
+</div>
+
+<script>
+  const tabs = [...document.querySelectorAll('.tabs button')];
+  tabs.forEach((b) => b.addEventListener('click', () => {
+    tabs.forEach((x) => {
+      const on = x === b;
+      x.setAttribute('aria-selected', on ? 'true' : 'false');
+      document.getElementById(x.dataset.t).hidden = !on;
+    });
+  }));
+</script>
+</body>
+</html>

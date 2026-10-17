@@ -218,7 +218,7 @@ function createHarness({
   const window = {
     ChosenAPI: api,
     innerWidth: 800,
-    innerHeight: 500,
+    innerHeight: 375,
     addEventListener() {},
   };
   const context = vm.createContext({
@@ -245,6 +245,7 @@ function createHarness({
     themeButtons,
     schemeButtons,
     state,
+    uiShell,
     async ready() {
       await flushMicrotasks();
     },
@@ -977,4 +978,59 @@ test("字号系数随保存落盘且不被无关设置冲掉", async () => {
   await harness.click("themeBtn");
   assert.equal(harness.state.settings.theme, "light");
   assert.equal(harness.state.settings.fontScale, 2.5, "无关字段保存不得冲掉字号系数");
+});
+
+test("设置加载期间拖动字号：迟到的默认值不覆盖预览且必须补偿保存", async () => {
+  const load = deferred();
+  const harness = createHarness({
+    api: {
+      loadSettings() {
+        return load.promise;
+      },
+    },
+  });
+
+  // 加载尚未返回时拖动滑条到 2.5×（42×2.5=105）
+  harness.elements.fontScaleInput.value = "2.5";
+  harness.elements.fontScaleInput.dispatch("input");
+  assert.equal(harness.body.style.getPropertyValue("--name-size"), "105px");
+  assert.equal(harness.state.calls.saveSettings, 0, "预览阶段不得落盘");
+
+  // 迟到的磁盘默认值（fontScale=1）此刻才到达
+  load.resolve({ theme: "dark", scheme: "mist", fontScale: 1, background: "" });
+  await harness.ready();
+
+  // ① 预览不得被迟到默认值覆盖
+  assert.equal(
+    harness.body.style.getPropertyValue("--name-size"),
+    "105px",
+    "加载迟到不得覆盖拖动预览"
+  );
+  assert.equal(harness.elements.fontScaleValue.textContent, "2.5×");
+  // ② 加载期间的预览必须补偿落盘，而不是整包丢弃
+  assert.equal(harness.state.calls.saveSettings, 1, "加载期间的预览必须补偿保存");
+  assert.equal(harness.state.settings.fontScale, 2.5);
+});
+
+test("字号保存失败时仍完成窗口适配", async () => {
+  const harness = createHarness({
+    api: {
+      async saveSettings() {
+        throw new Error("disk full");
+      },
+    },
+  });
+  await harness.ready();
+  // 初始化：系数 1.0 → 设计窗高 375，视口 375 → zoom 取 1
+  assert.equal(harness.uiShell.style.zoom, "1");
+
+  // 拖到上限：设计窗高变 648，zoom 必须按新设计窗高重算（min(800/800, 375/648) → 触底 0.7）
+  harness.elements.fontScaleInput.value = "3.2";
+  harness.elements.fontScaleInput.dispatch("input");
+
+  await assert.rejects(harness.elements.fontScaleInput.dispatch("change"), /disk full/);
+
+  assert.equal(harness.elements.statusHint.textContent, "设置保存失败");
+  // 保存失败也必须完成窗口适配：否则视口已按 3.2× 变高、窗口却没加高，名单区会被裁掉
+  assert.equal(harness.uiShell.style.zoom, "0.7", "保存失败也必须按新字号重算 zoom");
 });

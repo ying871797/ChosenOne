@@ -35,7 +35,7 @@ globalThis.document = {
 };
 globalThis.window = {
   innerWidth: 800,
-  innerHeight: 500,
+  innerHeight: 375,
   addEventListener: () => {},
 }; // api.js 会挂 mock
 globalThis.alert = () => {};

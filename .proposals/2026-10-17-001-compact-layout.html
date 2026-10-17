@@ -1,0 +1,349 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>方案 003 · UI 紧凑化（为更大字号腾空间）</title>
+<style>
+  :root{
+    --bg:#f3f5f7; --card:#fff; --ink:#1b242c; --dim:#5d6b78; --line:#dce2e8;
+    --brand:#20604a; --brand-soft:#e7f2ec;
+    --name:#2f7d5b; --name-soft:#dff0e7;
+    --chrome:#c2703a; --chrome-soft:#fbeade;
+    --air:#7a8794; --air-soft:#eceff2;
+    --warn:#b3261e; --warn-soft:#fdeceb;
+    --ok:#20604a; --ok-soft:#e7f2ec;
+    --info:#1b4f9c; --info-soft:#e8effa;
+    --r:12px;
+    --mono:"Cascadia Mono",Consolas,"Courier New",monospace;
+  }
+  *{box-sizing:border-box}
+  body{
+    margin:0;padding:26px 18px 60px;background:var(--bg);color:var(--ink);
+    font:15px/1.68 "Segoe UI","Microsoft YaHei","PingFang SC",sans-serif;
+  }
+  .wrap{max-width:1120px;margin:0 auto}
+  header.top{
+    background:linear-gradient(135deg,#16241d,#20604a 55%,#2f7d5b);
+    color:#eff6f2;border-radius:var(--r);padding:22px 26px;
+    box-shadow:0 8px 26px rgba(18,36,28,.22);
+  }
+  header.top h1{margin:0 0 6px;font-size:23px;letter-spacing:.4px}
+  header.top .meta{font-size:13px;opacity:.92}
+  .badge{display:inline-block;padding:1px 9px;border-radius:999px;font-size:12px;font-weight:700}
+  .b-wait{background:#fff1c9;color:#7d5a00}
+  .b-rec{background:#cdeadb;color:#14503a}
+  nav.tabs{display:flex;gap:6px;flex-wrap:wrap;margin:20px 0 0}
+  nav.tabs button{
+    border:1px solid var(--line);background:#fff;color:var(--dim);padding:9px 15px;
+    border-radius:999px;cursor:pointer;font:inherit;font-size:14px;transition:.15s;
+  }
+  nav.tabs button:hover{border-color:var(--brand);color:var(--brand)}
+  nav.tabs button[aria-selected="true"]{background:var(--brand);border-color:var(--brand);color:#fff;font-weight:700}
+  section.panel{display:none}
+  section.panel.active{display:block;animation:fade .2s ease}
+  @keyframes fade{from{opacity:.35;transform:translateY(4px)}to{opacity:1;transform:none}}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:18px 20px;margin:15px 0;box-shadow:0 1px 3px rgba(20,35,50,.05)}
+  .card h2{margin:0 0 10px;font-size:17px;display:flex;align-items:center;gap:8px}
+  .card h3{margin:15px 0 7px;font-size:14.5px;color:var(--brand)}
+  .dot{width:9px;height:9px;border-radius:50%;background:var(--brand);flex:none}
+  p{margin:8px 0}
+  .lead{color:var(--dim)}
+  code{background:#eef2f5;border:1px solid #e0e7ec;border-radius:5px;padding:1px 5px;font:13px/1.5 var(--mono);color:#20384c;word-break:break-all}
+  table{width:100%;border-collapse:collapse;margin:10px 0;font-size:13.5px}
+  th,td{text-align:left;padding:8px 9px;border-bottom:1px solid var(--line);vertical-align:top}
+  th{background:#f6f9fa;font-size:12.5px;color:var(--dim);font-weight:700;white-space:nowrap}
+  tr:last-child td{border-bottom:none}
+  td.num{font-family:var(--mono);text-align:right;white-space:nowrap}
+  .pill{display:inline-block;font-size:12px;font-weight:700;padding:2px 8px;border-radius:6px;white-space:nowrap}
+  .p-keep{background:var(--name-soft);color:var(--name)}
+  .p-chrome{background:var(--chrome-soft);color:var(--chrome)}
+  .p-air{background:var(--air-soft);color:var(--air)}
+  .p-now{background:#eef1f4;color:#5d6b78}
+  .p-mid{background:var(--brand-soft);color:var(--brand)}
+  /* 预算条 */
+  .ruler{margin:14px 0 6px}
+  .bar{display:flex;height:44px;border-radius:9px;overflow:hidden;border:1px solid var(--line);box-shadow:inset 0 1px 2px rgba(0,0,0,.04)}
+  .seg{display:flex;align-items:center;justify-content:center;font-size:11.5px;font-weight:700;color:#fff;overflow:hidden;position:relative}
+  .seg.s-name{background:linear-gradient(180deg,#3f9269,#2f7d5b)}
+  .seg.s-chrome{background:linear-gradient(180deg,#d08a58,#c2703a)}
+  .seg.s-air{background:repeating-linear-gradient(45deg,#e3e7eb,#e3e7eb 6px,#eff2f5 6px,#eff2f5 12px);color:#6b7784}
+  .scale{display:flex;justify-content:space-between;font:11.5px var(--mono);color:var(--dim);margin-top:5px}
+  .legend{display:flex;gap:14px;flex-wrap:wrap;font-size:12.5px;color:var(--dim);margin-top:8px}
+  .legend i{display:inline-block;width:11px;height:11px;border-radius:3px;margin-right:5px;vertical-align:-1px}
+  .kvs{display:grid;grid-template-columns:repeat(auto-fit,minmax(215px,1fr));gap:10px;margin:12px 0}
+  .kv{background:#fafcfd;border:1px solid var(--line);border-left:4px solid var(--brand);border-radius:8px;padding:10px 12px}
+  .kv .q{font-size:12px;color:var(--dim)}
+  .kv .a{font-weight:700;color:var(--brand);margin-top:2px}
+  .kv .a small{display:block;font-weight:400;color:var(--dim);font-size:12px}
+  .callout{border-left:4px solid var(--brand);background:var(--brand-soft);border-radius:8px;padding:11px 14px;margin:12px 0}
+  .callout.warn{border-left-color:var(--warn);background:var(--warn-soft)}
+  .callout.info{border-left-color:var(--info);background:var(--info-soft)}
+  .flow{display:flex;flex-wrap:wrap;margin:12px 0 4px}
+  .step{flex:1 1 155px;min-width:145px;background:#fafcfd;border:1px solid var(--line);border-top:4px solid var(--brand);border-radius:8px;padding:10px 12px;margin:6px 4px}
+  .step.gate{border-top-color:var(--warn)}.step.gate .n{color:var(--warn)}
+  .step .n{font:700 11.5px var(--mono);color:var(--brand);letter-spacing:.5px}
+  .step .t{font-weight:700;font-size:13.5px;margin:3px 0}
+  .step .d{font-size:12.5px;color:var(--dim)}
+  ul{margin:8px 0 8px 20px;padding:0}
+  li{margin:4px 0}
+  .mono li{font-family:var(--mono);font-size:13px}
+  footer.foot{color:var(--dim);font-size:13px;text-align:center;margin-top:24px}
+  .rec{outline:2px solid var(--brand);outline-offset:-2px}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="top">
+  <h1>方案 003 · UI 紧凑化 —— 为更大字号腾空间</h1>
+  <div class="meta">
+    2026-10-17 · 需求原话「我想让UI更紧凑一些来保证字体更大」 · 依据：CDP 真实渲染实测
+    · 状态：<span class="badge b-wait">等待批准</span>
+  </div>
+</header>
+
+<nav class="tabs" role="tablist">
+  <button role="tab" aria-selected="true" data-tab="p1">① 目标与实测</button>
+  <button role="tab" aria-selected="false" data-tab="p2">② 三档方案</button>
+  <button role="tab" aria-selected="false" data-tab="p3">③ 实施步骤</button>
+  <button role="tab" aria-selected="false" data-tab="p4">④ 文件与风险</button>
+  <button role="tab" aria-selected="false" data-tab="p5">⑤ 待你决定</button>
+</nav>
+
+<!-- ========== ① 目标与实测 ========== -->
+<section class="panel active" id="p1">
+  <div class="card">
+    <h2><span class="dot"></span>问题的算术</h2>
+    <p><code>设计窗高 = 非名单区(chrome 260px) + 名单区(3 × 行高)</code>，而 <code>行高 = 53.4 × 字号系数</code>。</p>
+    <p>所以：<b>chrome 越厚，同一块屏幕上能容纳的字号就越小</b>。你想让字更大 —— 直接拉高系数会把窗口顶到屏幕外，
+       而 chrome 里恰恰有 ~90px 是「空气」：不是名单区，也不是内容，纯留白与内边距。</p>
+    <div class="kvs">
+      <div class="kv"><div class="q">现状 2.5× 时的窗口</div><div class="a">800 × 662<small>中央行字号 115px</small></div></div>
+      <div class="kv"><div class="q">同一块屏幕，只把 chrome 压到 ~170</div><div class="a">可支撑 3.0×<small>中央行字号 138px（+20%）</small></div></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2><span class="dot"></span>实测垂直预算（设计像素，fontScale 1.0）</h2>
+    <div class="ruler">
+      <div class="bar">
+        <div class="seg s-chrome" style="flex:0 0 62px" title="顶栏">62</div>
+        <div class="seg s-chrome" style="flex:0 0 16px" title="舞台内边距"></div>
+        <div class="seg s-chrome" style="flex:0 0 16px" title="窗框内边距"></div>
+        <div class="seg s-name" style="flex:0 0 240px" title="名单区">名单区 240（3 × 80）</div>
+        <div class="seg s-chrome" style="flex:0 0 13px" title="框↔提示间距"></div>
+        <div class="seg s-chrome" style="flex:0 0 22px" title="状态提示">22</div>
+        <div class="seg s-air" style="flex:0 0 31px" title="舞台留白">留白 31</div>
+        <div class="seg s-chrome" style="flex:0 0 10px" title="控制区间距"></div>
+        <div class="seg s-chrome" style="flex:0 0 34px" title="控制区内边距">34</div>
+        <div class="seg s-chrome" style="flex:0 0 51px" title="抽取按钮">按钮 51</div>
+      </div>
+      <div class="scale"><span>0</span><span>125</span><span>250</span><span>375</span><span>500px</span></div>
+      <div class="legend">
+        <span><i style="background:#2f7d5b"></i>名单区（主角，从不压缩）</span>
+        <span><i style="background:#c2703a"></i>可压缩的 chrome</span>
+        <span><i style="background:#e3e7eb"></i>纯留白（视觉呼吸）</span>
+      </div>
+    </div>
+    <table>
+      <tr><th>构成项</th><th style="width:90px">实测</th><th>细节</th></tr>
+      <tr><td>顶栏</td><td class="num">62</td><td>上下内边距 14 + 8，内容高由 40×40 的图标钮撑起</td></tr>
+      <tr><td>舞台内边距</td><td class="num">16</td><td>6 上 + 10 下</td></tr>
+      <tr><td>窗框内边距</td><td class="num">16</td><td>雾玻璃边框 8 × 2（<code>576 = 560 视口 + 2×8</code> 的宽度不变量）</td></tr>
+      <tr><td><b>名单视口</b></td><td class="num"><b>240</b></td><td>3 行 × 80px，随字号系数增长 —— <b>不动</b></td></tr>
+      <tr><td>框 ↔ 状态提示 间距</td><td class="num">13</td><td>提示的 <code>margin-top</code></td></tr>
+      <tr><td>状态提示</td><td class="num">22</td><td>字号 15px，<code>min-height: 22px</code></td></tr>
+      <tr><td><b>舞台留白</b></td><td class="num"><b>31</b></td><td><code>justify-content: center</code> 把多余高度分给上下（实测上 16.1 / 下 15.1）</td></tr>
+      <tr><td>控制区间距</td><td class="num">10</td><td><code>margin-top</code></td></tr>
+      <tr><td>控制区内边距</td><td class="num">34</td><td>16 上 + 18 下</td></tr>
+      <tr><td>抽取按钮</td><td class="num">51</td><td>内边距 14 × 2 + 21px 字</td></tr>
+      <tr><td><b>合计</b></td><td class="num"><b>≈495</b></td><td>与设计窗高 500 的 ~5px 差为取整与行盒余量</td></tr>
+    </table>
+    <div class="callout info">
+      <strong>测量方式：</strong>无头 Chrome + CDP 打开 <code>src/index.html</code>（browser mock 分支），
+      读 <code>getBoundingClientRect()</code> 与计算样式后除以 <code>zoom</code> 换算成设计像素，不是估算。
+    </div>
+  </div>
+</section>
+
+<!-- ========== ② 三档方案 ========== -->
+<section class="panel" id="p2">
+  <div class="card">
+    <h2><span class="dot"></span>三档：逐项数值（设计像素）</h2>
+    <table>
+      <tr>
+        <th>构成项</th><th style="width:64px">现状</th><th style="width:64px">轻度</th>
+        <th style="width:64px">中度</th><th style="width:64px">激进</th><th>改法</th>
+      </tr>
+      <tr><td>顶栏</td><td class="num">62</td><td class="num">52</td><td class="num">44</td><td class="num">40</td><td>内边距 14/8 → 10/6 → 6/4；图标钮 40 → 36 → 34 → 30</td></tr>
+      <tr><td>舞台内边距</td><td class="num">16</td><td class="num">10</td><td class="num">8</td><td class="num">4</td><td>6/10 → 4/6 → 4/4 → 2/2</td></tr>
+      <tr><td>窗框内边距</td><td class="num">16</td><td class="num">12</td><td class="num">10</td><td class="num">8</td><td>8 → 6 → 5 → 4（宽度不变量同步改为「视口 + 2×内边距」）</td></tr>
+      <tr><td>框↔提示间距</td><td class="num">13</td><td class="num">10</td><td class="num">8</td><td class="num">6</td><td><code>margin-top</code> 递减</td></tr>
+      <tr><td>状态提示</td><td class="num">22</td><td class="num">20</td><td class="num">18</td><td class="num">16</td><td>字号 15 → 14 → 13 → 12px，<code>min-height</code> 同步</td></tr>
+      <tr><td>舞台留白</td><td class="num">31</td><td class="num">16</td><td class="num">16</td><td class="num">8</td><td>只调 <code>DESIGN_CHROME_H</code> 里预留给呼吸的部分</td></tr>
+      <tr><td>控制区间距</td><td class="num">10</td><td class="num">8</td><td class="num">4</td><td class="num">2</td><td><code>margin-top</code> 递减</td></tr>
+      <tr><td>控制区内边距</td><td class="num">34</td><td class="num">26</td><td class="num">18</td><td class="num">12</td><td>16/18 → 12/14 → 8/10 → 6/6</td></tr>
+      <tr><td>抽取按钮</td><td class="num">51</td><td class="num">47</td><td class="num">40</td><td class="num">36</td><td>内边距 14 → 12 → 9 → 7；字号 21 → 19 → 18</td></tr>
+      <tr style="background:#f6f9fa"><td><b>chrome 合计</b></td><td class="num"><b>260</b></td><td class="num"><b>200</b></td><td class="num"><b>170</b></td><td class="num"><b>135</b></td><td>省下 60 / 90 / 125px</td></tr>
+    </table>
+  </div>
+
+  <div class="card rec">
+    <h2><span class="dot"></span>收益对照（同一块屏幕）</h2>
+    <table>
+      <tr><th>档位</th><th style="width:110px">2.5× 时窗高</th><th style="width:150px">662px 窗高可支撑</th><th>净效果</th></tr>
+      <tr><td>现状</td><td class="num">662</td><td class="num">2.5×</td><td>基线</td></tr>
+      <tr><td>轻度</td><td class="num">602</td><td class="num">≈2.85×</td><td>同样 2.5× 少占 60px 屏高</td></tr>
+      <tr class="rec"><td><b>中度（推荐）</b></td><td class="num"><b>572</b></td><td class="num"><b>≈3.05×</b></td><td><b>可直接开到 3.0×，中央行 115 → 138px</b></td></tr>
+      <tr><td>激进</td><td class="num">537</td><td class="num">≈3.25×</td><td>更密，留白几乎归零</td></tr>
+    </table>
+    <p class="lead">另有免费的 +15%：压缩后设计窗高变小，若你的窗口比设计窗高更高，
+       等比缩放会把余高用掉（<code>zoom</code> 上限 1.15），字号随之再变大 —— 不需要额外设置。</p>
+  </div>
+
+  <div class="card">
+    <h2><span class="dot"></span>横向：一块被浪费的宽度（可选）</h2>
+    <p>窗口 800px 宽，但窗框 <code>max-width: 576</code>，两侧还各留 32px 舞台内边距 —— 实际只用了 72% 的宽度。</p>
+    <table>
+      <tr><th>项</th><th style="width:90px">现状</th><th style="width:90px">可选</th><th>收益</th></tr>
+      <tr><td>舞台左右内边距</td><td class="num">32+32</td><td class="num">20+20</td><td>让出 24px</td></tr>
+      <tr><td>名单视口宽度</td><td class="num">560</td><td class="num">600</td><td>5 字名字在 2.5× 下不再降档（560 放不下 575+字距，600 刚好）</td></tr>
+    </table>
+    <p class="lead">横向改动只影响「长名字是否缩档」，对短名字没有视觉变化；不改动名单区高度，也不影响任何动画几何。</p>
+  </div>
+
+  <div class="card">
+    <h2><span class="dot"></span>设计意图：不是乱压，是换成统一节奏</h2>
+    <ul>
+      <li>现状间距是 <code>6/8/10/13/14/16/18/22/26/32</code> 的混合；紧凑版统一到 <b>4px 基准阶梯</b>（4/8/12/16/20），比例关系保持一致。</li>
+      <li>保留全部设计语言：雾玻璃窗框、虚线分隔、金色高亮、圆角比例（<code>24 → 20</code> 与更薄的内边距成比例）。</li>
+      <li>抽取按钮依旧是唯一的实心光块 —— 先减内边距、后减字号，保住主按钮的存在感。</li>
+      <li>图标钮 34px 对鼠标足够（Windows 桌面建议 32px+），不套用 44px 触控基准。</li>
+      <li><b>名单区 3 行视口从不压缩</b>：省下的每一像素都还给字号。</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ========== ③ 实施步骤 ========== -->
+<section class="panel" id="p3">
+  <div class="card">
+    <h2><span class="dot"></span>动线</h2>
+    <div class="flow">
+      <div class="step"><div class="n">阶段 0</div><div class="t">分支归宿</div><div class="d">先合并品牌文案，再从 master 拉 <code>feat/compact-layout</code>（或叠加为第 3 提交，见⑤）</div></div>
+      <div class="step"><div class="n">阶段 1</div><div class="t">间距变量化</div><div class="d">把上表各项抽成 <code>:root</code> 变量，整档切换只改一处</div></div>
+      <div class="step"><div class="n">阶段 2</div><div class="t">几何常量</div><div class="d">main.js 的 <code>DESIGN_CHROME_H</code> / <code>FONT_SCALE_MAX</code> 按档位改</div></div>
+      <div class="step"><div class="n">阶段 3</div><div class="t">上限与窗口</div><div class="d">settings.rs 上限、<code>tauri.conf.json minHeight</code>、滑条 max</div></div>
+      <div class="step gate"><div class="n">阶段 4</div><div class="t">同步门禁</div><div class="d">3 个 verify 桩的 <code>innerHeight: 500</code> 与 verify-render 的 vpH 区间必改</div></div>
+      <div class="step gate"><div class="n">阶段 5</div><div class="t">复测与目检</div><div class="d">重跑 CDP 测量脚本对比紧凑前后 + 真机目检</div></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2><span class="dot"></span>阶段 1 为什么先变量化</h2>
+    <p>上一轮字号上限的改动里，几何值是散落的魔法数字（<code>53.4</code> / <code>260</code> / <code>500</code>）。这次先把间距收进变量，之后你若想「再紧一点」就是改一两个值，不用再动结构。示例：</p>
+    <table>
+      <tr><th>变量</th><th>现状写法</th><th>紧凑后</th></tr>
+      <tr><td><code>--ui-pad-x</code></td><td>顶栏 26 / 舞台 32 / 控制区 26</td><td>统一 20（横向可选档位）</td></tr>
+      <tr><td><code>--ctl-pad-y</code></td><td>16 / 18</td><td>8 / 10</td></tr>
+      <tr><td><code>--hint-gap</code></td><td>13</td><td>8</td></tr>
+      <tr><td><code>--icon-btn</code></td><td>40px</td><td>34px</td></tr>
+    </table>
+  </div>
+
+  <div class="card">
+    <h2><span class="dot"></span>阶段的验证动作</h2>
+    <ul class="mono">
+      <li>node scripts/measure-layout.js（临时脚本，复测紧凑前后逐项 px）</li>
+      <li>npm test · node scripts/verify-{fontscale,roll,roster,render}.js</li>
+      <li>cargo test（src-tauri/ 下）</li>
+      <li>真机：设置面板拉到上限，看 3 行是否完整、按钮是否被裁</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ========== ④ 文件与风险 ========== -->
+<section class="panel" id="p4">
+  <div class="card">
+    <h2><span class="dot"></span>涉及修改的文件</h2>
+    <table>
+      <tr><th style="width:250px">文件</th><th>改动</th></tr>
+      <tr><td><code>src/style.css</code></td><td>间距变量 + 顶栏/舞台/窗框/提示/控制区/按钮尺寸与圆角；文件头硬约束注释同步</td></tr>
+      <tr><td><code>src/main.js</code></td><td><code>DESIGN_CHROME_H 260 → 新值</code>、<code>FONT_SCALE_MAX</code>（若提上限）、相关注释</td></tr>
+      <tr><td><code>src/index.html</code></td><td>字号滑条 <code>max</code>（若提上限）</td></tr>
+      <tr><td><code>src-tauri/src/settings.rs</code></td><td><code>FONT_SCALE_MAX</code> + 文档注释 + 越界用例（若提上限）</td></tr>
+      <tr><td><code>src-tauri/tauri.conf.json</code></td><td><code>minHeight 500 → 新设计窗高</code>（否则默认窗偏高、底部多出留白）</td></tr>
+      <tr><td><code>scripts/verify-fontscale.js</code><br><code>scripts/verify-roll.js</code><br><code>scripts/verify-roster.js</code></td><td><b>必须改</b>：桩里 <code>innerHeight: 500</code> 假定「设计窗高 = 500」，压缩后同一窗高会让 zoom 变成 1.15，断言失效</td></tr>
+      <tr><td><code>scripts/verify-render.js</code></td><td>vpH 区间 <code>180~260</code> 按新 zoom 调整；窗口尺寸或断言同步</td></tr>
+      <tr><td><code>CONTEXT.md</code></td><td>「字体大小」「布局等比缩放」两条术语里的 500 / 662 等数值与描述</td></tr>
+      <tr><td><code>README.md</code> / <code>AGENTS.md</code></td><td>若出现 800×500 或几何硬约束描述，同步更新</td></tr>
+    </table>
+  </div>
+
+  <div class="card">
+    <h2><span class="dot"></span>风险与回滚</h2>
+    <table>
+      <tr><th style="width:230px">风险</th><th>影响</th><th style="width:300px">处置</th></tr>
+      <tr><td>门禁断言连锁失效</td><td><code>npm test</code> / verify 脚本变红</td><td>档位确定后先改 4 个脚本再跑；这是本方案最容易出问题的地方</td></tr>
+      <tr><td>视觉过挤</td><td>「紧凑」变成「憋屈」</td><td>分三档让你选；中度只收到 4px 阶梯，未触及极限</td></tr>
+      <tr><td>顶栏钮变小</td><td>点击目标变窄</td><td>34px 仍高于桌面建议下限；不喜欢就退回 36px</td></tr>
+      <tr><td>状态提示字号 15 → 13px</td><td>可读性下降</td><td>目检确认；提示文字本就短（「可抽 47 人」）</td></tr>
+      <tr><td><code>minHeight</code> 与新设计窗高不一致</td><td>小字号下窗口偏高、底部空一块</td><td>同步改 <code>minHeight</code>；改完实测各档窗高</td></tr>
+      <tr><td>宽度不变量被破坏</td><td>名单区宽度塌缩（历史回归）</td><td>窗框 <code>max-width</code> 始终 = 视口 <code>max-width</code> + 2×窗框内边距，注释同步</td></tr>
+    </table>
+    <div class="callout">
+      <strong>回滚：</strong>改动只涉及样式与几何常量，不写 <code>settings.json</code>、不动数据文件。
+      分支未合并时 <code>git branch -D</code>；已合并则 <code>git revert</code>。
+    </div>
+  </div>
+</section>
+
+<!-- ========== ⑤ 待你决定 ========== -->
+<section class="panel" id="p5">
+  <div class="card">
+    <h2><span class="dot"></span>需要你定的四件事</h2>
+    <table>
+      <tr><th style="width:210px">决策</th><th>选项（<b>粗体为我的建议</b>）</th></tr>
+      <tr>
+        <td>① 紧凑力度</td>
+        <td><b>中度（chrome 260→170，省 90px）</b> · 轻度（→200，稳） · 激进（→135，很密） · 或按上表自由混搭</td>
+      </tr>
+      <tr>
+        <td>② 要不要同时抬高字号上限</td>
+        <td><b>要，2.5× → 3.0×</b>（中度下 3.0× 窗高 650px，比现在 2.5× 的 662px 还矮） · 保持 2.5× 只做紧凑 · 抬到 3.2×</td>
+      </tr>
+      <tr>
+        <td>③ 横向也用起来吗</td>
+        <td><b>用（舞台左右 32→20、视口 560→600）</b> · 不动，只做纵向紧凑</td>
+      </tr>
+      <tr>
+        <td>④ 分支归宿</td>
+        <td><b>先目检并合并品牌文案分支，再从 master 拉 feat/compact-layout</b> · 直接叠加为第 3 个提交（一次合并）</td>
+      </tr>
+    </table>
+    <div class="callout warn">
+      <strong>提醒：</strong>「紧凑化」会改变窗口的默认高度（中度下 1.0× 时 500 → 410）。
+      如果你更希望「窗口高度不变、只把字变大」，说一声 —— 那就走②抬上限、不动 chrome 的路线，收益会小一些。
+    </div>
+  </div>
+</section>
+
+<footer class="foot">
+  ChosenOne · 方案审批流程产物 · 批准后按阶段落地：机械门禁 + 你目检双确认才收工，推送前再单独二次确认。
+</footer>
+
+</div>
+<script>
+  (function () {
+    var tabs = document.querySelectorAll("nav.tabs button");
+    var panels = document.querySelectorAll("section.panel");
+    tabs.forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        tabs.forEach(function (b) { b.setAttribute("aria-selected", String(b === btn)); });
+        panels.forEach(function (p) { p.classList.toggle("active", p.id === btn.dataset.tab); });
+      });
+    });
+  })();
+</script>
+</body>
+</html>

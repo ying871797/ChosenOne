@@ -24,8 +24,18 @@ npm run tauri dev     # 开发模式（beforeDevCommand 为空，直接加载 sr
 npm run tauri build   # 打包 NSIS 每用户安装器
 npx tauri build --no-bundle  # 便携版自包含 exe → src-tauri/target/release/chosenone.exe
 
+npm test              # 前端逻辑测试（node --test，tests/main.test.js + tests/api.test.js）
+node scripts/verify-fontscale.js  # 字号系数全链路（CSS 变量/行高/视口/档位/落盘）
+node scripts/verify-roll.js       # 老虎机滚动几何（加 --long 跑长名退化路径）
+node scripts/verify-roster.js     # 名单解析/排除/统计链路（用真实 api.js mock）
+node scripts/verify-render.js     # 真实 Chrome 渲染门禁（视口几何 + 字号链 + 长名降档；无浏览器则 SKIP）
+
 cargo test            # 在 src-tauri/ 下；覆盖 names/exclude/settings/util 的解析逻辑
 ```
+
+**改了布局几何（`DESIGN_CHROME_H`／紧凑节奏变量／字号上限）后**：四条上面的验证必须全跑；其中
+`verify-fontscale.js` / `verify-roll.js` / `verify-roster.js` 与 `tests/main.test.js` 里的窗口基准桩
+（`innerHeight`，等价于设计窗高）要跟着改，否则等比缩放会变成 1.15 而断言失败。
 
 ## 架构要点
 

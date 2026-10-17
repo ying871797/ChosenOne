@@ -1,6 +1,6 @@
 /* 验证脚本：字体大小（fontScale）设置全链路（最小 DOM 桩 + 真实 src/main.js）。
  * 断言：
- *   1) 加载归一化：fontScale=3.0（越界）→ 2.5，CSS 变量/行高/视口/滑条/读数同步；
+ *   1) 加载归一化：fontScale=9.9（越界）→ 3.2，CSS 变量/行高/视口/滑条/读数同步；
  *   2) tier 档位 × 系数：抽取 12 字名 → 行内字号 = round(24 × s)；
  *   3) 实时预览：input 事件改 CSS 变量但不落盘，且已填行重刷；
  *   4) clamp 边界：0.1 → 0.8；系数 1.0 时 CSS 变量与基准像素恒等（42/46px、行高 80/视口 240）；
@@ -57,7 +57,7 @@ globalThis.document = {
 const savedSettings = []; // 捕获 saveSettings 快照
 globalThis.window = {
   innerWidth: 800,
-  innerHeight: 500,
+  innerHeight: 375,
   addEventListener: () => {},
   ChosenAPI: {
     getRoster: () =>
@@ -67,7 +67,7 @@ globalThis.window = {
         excluded: [],
       }),
     // 故意给越界值：验证前端 clamp（后端 load 已 clamp，前端兜底同类逻辑）
-    loadSettings: () => Promise.resolve({ theme: "dark", fontScale: 3.0, background: "" }),
+    loadSettings: () => Promise.resolve({ theme: "dark", fontScale: 9.9, background: "" }),
     saveSettings: (s) => { savedSettings.push(s); return Promise.resolve(); },
     getAppDir: () => Promise.resolve(""),
     openAppDir: () => Promise.resolve(),
@@ -88,21 +88,21 @@ const bodyStyle = document.body.style;
 async function main() {
   await sleep(80); // 等 init（含 loadAndApplySettings）
 
-  // 1) 加载归一化：3.0 → 2.5；CSS 变量 / 行高 / 视口 / 滑条 / 读数同步
-  assert.strictEqual(bodyStyle.getPropertyValue("--name-size"), "105px", `3.0 应 clamp 到 2.5 → 105px，实际 ${bodyStyle.getPropertyValue("--name-size")}`);
-  assert.strictEqual(bodyStyle.getPropertyValue("--name-size-center"), "115px", `中央行应 115px，实际 ${bodyStyle.getPropertyValue("--name-size-center")}`);
-  assert.strictEqual(bodyStyle.getPropertyValue("--row-h"), "134px", `2.5 行高应 134px，实际 ${bodyStyle.getPropertyValue("--row-h")}`);
-  assert.strictEqual(bodyStyle.getPropertyValue("--viewport-h"), "402px", `2.5 视口应 402px，实际 ${bodyStyle.getPropertyValue("--viewport-h")}`);
-  assert.strictEqual(els.fontScaleInput.value, "2.5", `滑条应同步 2.5，实际 ${els.fontScaleInput.value}`);
-  assert.strictEqual(els.fontScaleValue.textContent, "2.5×", `读数应 2.5×，实际 ${els.fontScaleValue.textContent}`);
+  // 1) 加载归一化：9.9 → 3.2；CSS 变量 / 行高 / 视口 / 滑条 / 读数同步
+  assert.strictEqual(bodyStyle.getPropertyValue("--name-size"), "134px", `9.9 应 clamp 到 3.2 → 134px，实际 ${bodyStyle.getPropertyValue("--name-size")}`);
+  assert.strictEqual(bodyStyle.getPropertyValue("--name-size-center"), "147px", `中央行应 147px，实际 ${bodyStyle.getPropertyValue("--name-size-center")}`);
+  assert.strictEqual(bodyStyle.getPropertyValue("--row-h"), "171px", `3.2 行高应 171px，实际 ${bodyStyle.getPropertyValue("--row-h")}`);
+  assert.strictEqual(bodyStyle.getPropertyValue("--viewport-h"), "513px", `3.2 视口应 513px，实际 ${bodyStyle.getPropertyValue("--viewport-h")}`);
+  assert.strictEqual(els.fontScaleInput.value, "3.2", `滑条应同步 3.2，实际 ${els.fontScaleInput.value}`);
+  assert.strictEqual(els.fontScaleValue.textContent, "3.2×", `读数应 3.2×，实际 ${els.fontScaleValue.textContent}`);
   assert.strictEqual(savedSettings.length, 0, "仅加载不落盘");
 
-  // 2) 抽取：12 字名 → tier base 24 × 2.5 → round(60) = 60px
+  // 2) 抽取：12 字名 → tier base 24 × 3.2 → round(76.8) = 77px
   els.drawBtn.dispatch("click");
   await sleep(1700);
   const hit = els.slotList.children.find((r) => r.classSet.has("hit"));
   assert(hit, "应有高亮行");
-  assert.strictEqual(hit.style.fontSize, "60px", `tier 应 24×2.5=60px，实际 ${hit.style.fontSize}`);
+  assert.strictEqual(hit.style.fontSize, "77px", `tier 应 24×3.2=77px，实际 ${hit.style.fontSize}`);
 
   // 3) 实时预览（input 不落盘）：0.1 → clamp 0.8，已填行同步重刷
   els.fontScaleInput.value = "0.1";
@@ -147,7 +147,7 @@ async function main() {
   els.resetBtn.dispatch("click");
   assert.strictEqual(els.slotList.style.transform, "translateY(0px)", "重置位移归 0");
 
-  console.log("PASS 加载clamp=2.5 变量=105/115px 行高=134 视口=402 tier=60px 预览=34px(19px) 恒等=42/46+80/240 临界=1.5/80 2.0/107");
+  console.log("PASS 加载clamp=3.2 变量=134/147px 行高=171 视口=513 tier=77px 预览=34px(19px) 恒等=42/46+80/240 临界=1.5/80 2.0/107");
 }
 
 main().catch((e) => {

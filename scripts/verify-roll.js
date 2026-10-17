@@ -64,7 +64,7 @@ globalThis.document = {
 
 globalThis.window = {
   innerWidth: 800,
-  innerHeight: 500,
+  innerHeight: 375,
   addEventListener: () => {},
   ChosenAPI: {
     getRoster: () =>
@@ -115,7 +115,7 @@ function centerRow(vis) {
 async function main() {
   await sleep(80); // 等 init 完成
 
-  // 0) 布局缩放：800×500（=设计基准）时 zoom 应为 1
+  // 0) 布局缩放：800×375（=设计基准）时 zoom 应为 1
   assert.strictEqual(uiShell.style.zoom, "1", `基准窗口下缩放应为 1，实际 ${uiShell.style.zoom}`);
 
   // 1) 条带构建：42 行；初始 3 行可见、🎲 居中

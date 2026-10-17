@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>天选之子 · ChosenOne</title>
+  <title>点名器</title>
   <link rel="stylesheet" href="style.css">
 </head>
 <body data-theme="dark">
@@ -21,20 +21,10 @@
       <i class="dust"></i><i class="dust"></i><i class="dust"></i>
     </div>
     <div class="app">
-      <!-- 顶栏 -->
+      <!-- 顶栏：只保留右侧工具按钮。
+           原「叶子图标 + 品牌标题 + 副标题」整块已按需求删除（勿再添加品牌文案）。
+           顶栏高度由 40px 圆钮决定，故删除标题块不影响下方名单区位置。 -->
       <header class="topbar">
-        <h1 class="title">
-          <svg class="brand-leaf" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-               stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-            <path d="M12 20.5 C12 13 12 7 12 3.5"/>
-            <path d="M12 9 C8.5 7.5 6 4.5 4.5 2.5"/>
-            <path d="M12 9 C15.5 7.5 18 4.5 19.5 2.5"/>
-            <path d="M12 15 C8.5 13.5 6 10.5 4.5 8.5"/>
-            <path d="M12 15 C15.5 13.5 18 10.5 19.5 8.5"/>
-          </svg>
-          <span class="title-text">天选之子</span>
-          <span class="title-sub">好运常青</span>
-        </h1>
         <div class="toolbar">
           <button id="themeBtn" class="icon-btn" title="切换主题（夜林 ⇄ 晨光）">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"

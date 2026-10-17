@@ -1,4 +1,4 @@
-/* ===== 天选之子 · 主逻辑 =====
+/* ===== 主逻辑 =====
  * 抽取逻辑 + 老虎机竖排滚动动画 + 文件变化同步 + 主题/设置
  */
 
@@ -387,7 +387,7 @@
     picked.add(target);
     isDrawing = false;
     refreshStatus();
-    setStatus(`🏆 天选之子：${target}`, STATUS_DRAW, OWNER_DRAW);
+    setStatus(`🏆 ${target}`, STATUS_DRAW, OWNER_DRAW);
   }
 
   // ---------- 重置 ----------

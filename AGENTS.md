@@ -1,12 +1,13 @@
-# AGENTS.md — ChosenOne 天选之子
+# AGENTS.md — ChosenOne
 
 Windows 桌面点名器。Tauri v2（Rust 后端 + 纯 HTML/CSS/JS 前端，**无前端构建链**）。
 
 ## 工作区布局（先看这个）
 
-- 仓库根目录在 `master` 分支，**只有文档**（CONTEXT.md、docs/、.proposals/），没有源码。
-- 应用源码在 `feat/chosenone` 分支，已 checkout 到 git worktree：**`.worktrees/chosenone/`**（被 .gitignore 排除）。
-- 写代码/运行构建去 `.worktrees/chosenone/`；改根级文档在根目录。改动涉及术语时同步更新 `CONTEXT.md`。
+- **单一主分支 `master`**：仓库根同时放文档与源码（`src/` 前端 + `src-tauri/` Rust 后端），没有独立的源码分支。
+- 开发动线：从 master 拉 `feat/<主题>` 功能分支 → 改动落在该分支 → 目检通过后 `git merge --no-ff` 回 master → 立即删除该分支。
+- `.worktrees/` 已弃用（`.gitignore` 仍排除它，目录当前为空）；默认直接在仓库根开发，需要并行隔离时再用 `git worktree`。
+- 改动涉及术语时同步更新 `CONTEXT.md`。
 
 ## 文档（动手前读）
 
@@ -15,7 +16,7 @@ Windows 桌面点名器。Tauri v2（Rust 后端 + 纯 HTML/CSS/JS 前端，**�
 - `docs/adr/` — 3 条 ADR：Tauri v2+静态前端 / 名单文件放 exe 同目录 + NSIS 每用户安装 / 已点名仅存会话内存。
 - 流程惯例：先 spec/ADR（superpowers 风格）后实现。
 
-## 命令（在 `.worktrees/chosenone/` 下执行）
+## 命令（在仓库根执行，标注例外者除外）
 
 ```bash
 npm install           # 只装 @tauri-apps/cli

@@ -1,4 +1,4 @@
-/* ===== 天选之子 · 样式 =====
+/* ===== 样式 =====
  * 设计语言：两套界面方案（body[data-scheme]，设置面板切换并持久化到 settings.json）
  * - mist（默认）= 晨雾林窗：dark 夜林晨雾 / light 晨光纸感
  * - chalk        = 绿板粉笔 · 木质课堂：dark 墨绿板+木质 / light 日光教室暖橡纸
@@ -302,42 +302,16 @@ body[data-scheme="chalk"][data-theme="light"] .bg-fx .dust {
 }
 
 /* ---------- 顶栏 ---------- */
+/* flex-end：只剩工具按钮一个子元素，若用 space-between 会被推到左边 */
 .topbar {
   display: flex;
-  justify-content: space-between;
+  justify-content: flex-end;
   align-items: center;
   padding: 14px 26px 8px;
 }
 
-.title {
-  display: flex;
-  align-items: baseline;
-  gap: 10px;
-}
-
-.brand-leaf {
-  width: 27px;
-  height: 27px;
-  color: var(--accent);
-  opacity: 0.92;
-  align-self: center;
-  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.25));
-}
-
-.title-text {
-  font-family: var(--font-display);
-  font-size: 26px;
-  font-weight: 700;
-  letter-spacing: 4px;
-  color: var(--ink);
-  text-shadow: var(--row-shadow);
-}
-
-.title-sub {
-  font-size: 12px;
-  letter-spacing: 2px;
-  color: var(--ink-faint);
-}
+/* 品牌标题块（.title / .brand-leaf / .title-text / .title-sub）已随需求移除，
+   对应的四条样式规则一并删除，避免留下死代码。 */
 
 .toolbar { display: flex; gap: 12px; }
 

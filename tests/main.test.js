@@ -869,7 +869,7 @@ test("抽取结果不会被迟到的背景错误覆盖", async () => {
   await flushMicrotasks();
   await harness.finishAnimation();
   await draw;
-  assert.match(harness.elements.statusHint.textContent, /天选之子/);
+  assert.match(harness.elements.statusHint.textContent, /🏆 /);
 
   harness.elements.bgInput.value = "new.png";
   const change = harness.elements.bgInput.dispatch("change");
@@ -877,7 +877,7 @@ test("抽取结果不会被迟到的背景错误覆盖", async () => {
   // 默认 readBackground 返回 null；让失败发生在读取分支之外不易构造，
   // 这里使用下方的专用错误 harness 覆盖保存失败场景。
   await change;
-  assert.match(harness.elements.statusHint.textContent, /天选之子/);
+  assert.match(harness.elements.statusHint.textContent, /🏆 /);
 });
 
 test("背景读取异常不会清空已有背景设置", async () => {

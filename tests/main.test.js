@@ -218,7 +218,7 @@ function createHarness({
   const window = {
     ChosenAPI: api,
     innerWidth: 800,
-    innerHeight: 500,
+    innerHeight: 375,
     addEventListener() {},
   };
   const context = vm.createContext({

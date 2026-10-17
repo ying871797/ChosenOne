@@ -5,10 +5,10 @@ use std::path::Path;
 
 /// 字体大小系数（名单区字号缩放）合法区间与默认值。
 /// 上限由几何决定：行高与视口随系数增长（见前端 rowHeightFor），
-/// 2.5× 时中央行字号 115px、字形约 101px、行高 134px、设计窗高 662px；
-/// 横向受视口宽 560px 约束，实测典型名单在 2.5× 下仍有余量。
+/// 3.2× 时中央行字号 147px、字形约 129px、行高 171px、视口 513px、
+/// 设计窗高 648px；横向受视口宽 640px 约束。
 pub const FONT_SCALE_MIN: f64 = 0.8;
-pub const FONT_SCALE_MAX: f64 = 2.5;
+pub const FONT_SCALE_MAX: f64 = 3.2;
 const FONT_SCALE_DEFAULT: f64 = 1.0;
 
 /// 归一化字号系数：非有限数回落默认值，越界 clamp 到合法区间。
@@ -29,7 +29,7 @@ pub struct Settings {
     /// 缺省/未知值时归一化为 `mist`（兼容旧版 settings.json）
     #[serde(default)]
     pub scheme: String,
-    /// 字体大小系数（名单区字号 × 系数，0.8~2.5）；缺省 1.0
+    /// 字体大小系数（名单区字号 × 系数，0.8~3.2）；缺省 1.0
     #[serde(default = "default_font_scale")]
     pub font_scale: f64,
     /// 背景图片文件名；空串表示使用默认纯色背景
@@ -266,12 +266,12 @@ mod tests {
 
     #[test]
     fn max_font_scale_is_preserved() {
-        // 2.5 是合法上限，必须原样保留（不被误 clamp）
+        // 3.2 是合法上限，必须原样保留（不被误 clamp）
         let p = temp_write(
             "settings-max-font-scale",
-            br#"{"theme":"dark","scheme":"mist","fontScale":2.5,"background":""}"#,
+            br#"{"theme":"dark","scheme":"mist","fontScale":3.2,"background":""}"#,
         );
-        assert_eq!(load_settings(&p).unwrap().font_scale, 2.5);
+        assert_eq!(load_settings(&p).unwrap().font_scale, 3.2);
         let _ = std::fs::remove_file(&p);
     }
 

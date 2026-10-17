@@ -183,11 +183,11 @@
   // ---------- 名单区几何（行高 / 视口随字号系数增长） ----------
   // 行高 = max(80, 46 × 0.88 × 1.32 × 系数)：46 为中央行基准字号，
   // 0.88 为中文字形墨高比，1.32 让字形上下各留约 16% 行内余量。
-  // 系数 ≤1.5 时结果恒为 80px（与旧几何逐位一致）；2.5× 时为 134px。
+  // 系数 ≤1.5 时结果恒为 80px（与旧几何逐位一致）；2.5× 时为 134px，3.2× 时为 171px。
   const ROW_H_MIN = 80;
   const ROW_H_PER_SCALE = 46 * 0.88 * 1.32; // ≈ 53.4
   const VIEWPORT_ROWS = 3;                  // 视口固定 3 行
-  const DESIGN_CHROME_H = 260;              // 设计窗高中非名单区的部分（500 − 240）
+  const DESIGN_CHROME_H = 135;              // 设计窗高中非名单区的部分（紧凑档实测 125.6 + 留白 ≈ 9）
   let rowH = ROW_H_MIN;                     // 当前行高；由 applyFontScale 随系数更新
 
   /** 行高：按字号系数增长，下限 80px（系数 ≤1.5 时与旧几何完全一致） */
@@ -200,17 +200,17 @@
     return rowHeightFor(scale) * VIEWPORT_ROWS;
   }
 
-  /** 设计窗高 = 非名单区高度 + 视口高（系数 1.0 时为 500px） */
+  /** 设计窗高 = 非名单区高度 + 视口高（系数 1.0 时为 375px） */
   function designHeightFor(scale) {
     return DESIGN_CHROME_H + viewportHeightFor(scale);
   }
 
-  // 字号系数（名单区）合法区间与默认值；上限 2.5× 由几何推得：
-  // 行高与视口随系数增长（见 rowHeightFor），2.5× 时中央行 115px、行高 134px、
-  // 设计窗高 662px；横向由视口宽 560px 兜底（实测典型名单 2.5× 下 483px）。
+  // 字号系数（名单区）合法区间与默认值；上限 3.2× 由几何推得：
+  // 行高与视口随系数增长（见 rowHeightFor），3.2× 时中央行 147px、字形约 129px、
+  // 行高 171px、视口 513px、设计窗高 648px；横向由视口宽 640px 兜底。
   // hit-pop 的 scale(1.15) 连同行盒一起缩放，不额外占用行高。与 settings.json 的 fontScale 同步。
   const FONT_SCALE_MIN = 0.8;
-  const FONT_SCALE_MAX = 2.5;
+  const FONT_SCALE_MAX = 3.2;
   let fontScale = 1; // 当前系数；applyFontScale 归一化后写入
 
   /** 归一化字号系数：非法值（NaN/Infinity/越界）回落默认或 clamp。 */
@@ -225,7 +225,7 @@
     return `${s.toFixed(2).replace(/0$/, "")}×`;
   }
 
-  // 超长名字自适应字号（可抽名宽度上限：视口最大宽 560px，中文一字 ≈ 字号 + 2px 字距）
+  // 超长名字自适应字号（可抽名宽度上限：视口最大宽 640px，中文一字 ≈ 字号 + 2px 字距）
   // base = 档位基准字号（px），实际行内字号 = base × fontScale；
   // base 0 = 不写行内样式，走 CSS 变量（--name-size / --name-size-center，已随系数联动）。
   const FONT_SIZE_TIERS = [

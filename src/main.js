@@ -210,6 +210,8 @@
   // 行高 171px、视口 513px、设计窗高 648px；横向视口铺满窗口（宽 = 窗口宽 − 舞台左右内边距），
   // 超长名字按实测宽度降档（见 applyRowFonts）。
   // hit-pop 的 scale(1.15) 连同行盒一起缩放，不额外占用行高。与 settings.json 的 fontScale 同步。
+  // ⚠️ 与后端 `src-tauri/src/settings.rs` 的 FONT_SCALE_MIN / FONT_SCALE_MAX 必须保持一致
+  //（无前端构建链，常量无法共享）：后端负责落盘归一化，这里负责浏览器预览与异常载荷的二次兜底。
   const FONT_SCALE_MIN = 0.8;
   const FONT_SCALE_MAX = 3.2;
   let fontScale = 1; // 当前系数；applyFontScale 归一化后写入
@@ -299,6 +301,9 @@
    * ② 更新行高/视口变量 --row-h / --viewport-h（≤1.5 恒为 80/240）并刷新当前行高；
    * ③ 档位行内字号需重跑 applyRowFonts 刷已填各行（按新字号重新量宽定档）。
    * 行高与位移同源（都用 rowH）：滚动始终对齐行边界，不会露白。
+   * 性能（实测，Chrome 42 行填满）：单次 input 全量重排 42 行约 3ms、峰值 4~6ms，
+   * 约占一帧 16.7ms 的 20%~35%；桌面端可接受，暂不做 rAF 合并或只重排可见行
+   *（前者会把同步断言改成异步、后者会让静止时相邻行残留旧档位）。
    * @param {number} value 目标系数
    * @returns {number} 归一化后的系数
    */
@@ -760,6 +765,8 @@
   // 名单区变高后需要更高的窗口才装得下：松手（change）与启动时按需把主窗口
   // 加高到「设计窗高」（宽度不动）。只增不减；仅当当前高度仍等于上次自动值时
   // 才跟随缩小，避免与用户手动缩放窗口打架。浏览器预览（无 __TAURI__）直接跳过。
+  // 注：只在「启动」与「改字号」两个时机调用，不会在用户拖动窗口时反复干预；
+  //     即使目标高度大于当前高度，applyLayoutScale 的 zoom 也会把界面缩到装得下。
   let lastAutoWindowHeight = 0;
 
   async function fitWindowHeight() {
@@ -881,15 +888,25 @@
   // 字体大小：input 拖动只实时预览，change（松手）才写 settings.json
   fontScaleInput.addEventListener("input", () => {
     const s = setFontScale(fontScaleInput.value);
-    // 设置仍在加载时记录补丁：迟到的默认值不得覆盖用户预览（与 saveCurrentSettings 同机制）
-    if (settingsLoadPatches) settingsLoadPatches.fontScale = s;
+    // 设置仍在加载时记录补丁：迟到的默认值不得覆盖用户预览（与 saveCurrentSettings 同机制）。
+    // ⚠️ 必须同时推进 settingsRevision：loadAndApplySettings 以「加载开始时的版本 ≠ 当前版本」
+    //    判定加载期间是否发生了用户操作；只记补丁不推进版本，补丁会在加载收尾时被整体丢弃。
+    if (settingsLoadPatches) {
+      settingsLoadPatches.fontScale = s;
+      settingsRevision += 1;
+    }
   });
   fontScaleInput.addEventListener("change", () =>
     handleSettingAction(async () => {
-      await saveCurrentSettings({ fontScale: currentSettings.fontScale });
-      // 名单区可能变高：先按需加高窗口，再按新设计窗高重算 zoom（窗口未变也要重算）
-      await fitWindowHeight();
-      applyLayoutScale();
+      try {
+        await saveCurrentSettings({ fontScale: currentSettings.fontScale });
+      } finally {
+        // 保存失败也必须完成窗口适配：否则视口已按新系数变高、窗口却没加高，名单区会被裁掉。
+        // （保存失败仍向上抛出，由 handleSettingAction 与状态栏照常提示。）
+        // 先按需加高窗口，再按新设计窗高重算 zoom（窗口未变也要重算）
+        await fitWindowHeight();
+        applyLayoutScale();
+      }
     })
   );
   bgInput.addEventListener("change", () =>

@@ -28,7 +28,7 @@
   --pad-topbar-b: 4px;    /* 顶栏下内边距 */
   --icon-btn: 32px;       /* 图标钮直径（桌面点击目标下限 32px） */
   --pad-stage-y: 2px;     /* 舞台上/下内边距 */
-  --pad-stage-x: 12px;    /* 舞台左/右内边距 */
+  --pad-stage-x: 20px;    /* 舞台左/右内边距（与 --pad-x 对齐，是窗框左右唯一的一道边） */
   --pad-frame: 4px;       /* 雾玻璃窗框内边距 */
   --gap-hint: 6px;        /* 窗框与状态提示的间距 */
   --hint-h: 16px;         /* 状态提示最小高度（固定高度，避免状态切换时跳动） */
@@ -363,14 +363,14 @@ body[data-scheme="chalk"][data-theme="light"] .bg-fx .dust {
   padding: var(--pad-stage-y) var(--pad-stage-x);
 }
 
-/* 窗框：一圈雾玻璃
+/* 窗框：一圈雾玻璃，宽度铺满舞台内容区（左右只留 --pad-stage-x，不再设宽度上限 ——
+ * 省下的横向空间全部还给名单区）。
  * ⚠️ 必须给确定宽度基准：否则内部 .slot-viewport 的 width:100% 会因
  *    包含块宽度不确定（shrink-to-fit 下百分比解析为 0）而塌缩为 0 宽，
- *    导致名单区整体不可见（历史回归）。648 = 640 视口 + 2×4 padding。 */
+ *    导致名单区整体不可见（历史回归）。此处 width:100% 相对舞台内容区解析。 */
 .slot-frame {
   position: relative;
   width: 100%;
-  max-width: 648px;
   padding: var(--pad-frame);
   border-radius: 20px;
   background: var(--frame-bg, linear-gradient(160deg, var(--fog-top), var(--fog-bottom)));
@@ -386,7 +386,6 @@ body[data-scheme="chalk"][data-theme="light"] .bg-fx .dust {
 .slot-viewport {
   position: relative;
   width: 100%;
-  max-width: 640px;
   height: var(--viewport-h, 240px);
   overflow: hidden;
   border-radius: 12px;

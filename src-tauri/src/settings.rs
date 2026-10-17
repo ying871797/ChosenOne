@@ -6,7 +6,7 @@ use std::path::Path;
 /// 字体大小系数（名单区字号缩放）合法区间与默认值。
 /// 上限由几何决定：行高与视口随系数增长（见前端 rowHeightFor），
 /// 3.2× 时中央行字号 147px、字形约 129px、行高 171px、视口 513px、
-/// 设计窗高 648px；横向受视口宽 640px 约束。
+/// 设计窗高 648px；横向可用宽度 = 视口宽（随窗口宽变化，800 宽窗口下 752px）。
 pub const FONT_SCALE_MIN: f64 = 0.8;
 pub const FONT_SCALE_MAX: f64 = 3.2;
 const FONT_SCALE_DEFAULT: f64 = 1.0;

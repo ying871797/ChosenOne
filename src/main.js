@@ -207,7 +207,8 @@
 
   // 字号系数（名单区）合法区间与默认值；上限 3.2× 由几何推得：
   // 行高与视口随系数增长（见 rowHeightFor），3.2× 时中央行 147px、字形约 129px、
-  // 行高 171px、视口 513px、设计窗高 648px；横向由视口宽 640px 兜底。
+  // 行高 171px、视口 513px、设计窗高 648px；横向视口铺满窗口（宽 = 窗口宽 − 舞台左右内边距），
+  // 超长名字按实测宽度降档（见 applyRowFonts）。
   // hit-pop 的 scale(1.15) 连同行盒一起缩放，不额外占用行高。与 settings.json 的 fontScale 同步。
   const FONT_SCALE_MIN = 0.8;
   const FONT_SCALE_MAX = 3.2;
@@ -225,32 +226,78 @@
     return `${s.toFixed(2).replace(/0$/, "")}×`;
   }
 
-  // 超长名字自适应字号（可抽名宽度上限：视口最大宽 640px，中文一字 ≈ 字号 + 2px 字距）
+  // 超长名字自适应字号：按「实测文字宽度」逐级降档，避免大字号下名字超出行宽被裁。
+  // 可用宽度 = 行宽（= 视口宽 = 窗口宽 − 舞台左右内边距 − 窗框内边距）。
   // base = 档位基准字号（px），实际行内字号 = base × fontScale；
   // base 0 = 不写行内样式，走 CSS 变量（--name-size / --name-size-center，已随系数联动）。
-  const FONT_SIZE_TIERS = [
-    { maxLen: 8, base: 0 },       // 默认字号（CSS：常行 42px / 中央行 46px × 系数）
-    { maxLen: 11, base: 30 },
-    { maxLen: 14, base: 24 },
-    { maxLen: Infinity, base: 20 },
-  ];
-  function applyRowFont(row, name) {
+  const FONT_SIZE_TIERS = [0, 30, 24, 20];
+  // 无排版测量能力的环境（单元测试桩）退回按字数判定，保证确定性
+  const CAN_MEASURE_TEXT = typeof document.createRange === "function";
+
+  /** 按字数判定的档位基准（仅无测量能力的环境使用） */
+  function tierBaseByLength(name) {
     const len = String(name).length;
-    let size = "";
-    for (const t of FONT_SIZE_TIERS) {
-      if (len <= t.maxLen) {
-        if (t.base) size = `${Math.round(t.base * fontScale)}px`;
-        break;
-      }
+    if (len <= 8) return 0;
+    if (len <= 11) return 30;
+    if (len <= 14) return 24;
+    return 20;
+  }
+
+  /**
+   * 行内文字实测宽度是否放得下行宽。
+   * ⚠️ 两边都必须取 getBoundingClientRect（同一坐标空间，含 .ui-shell 的 zoom 缩放）：
+   * 若拿文字 rect 宽和 row.clientWidth 比，zoom≠1 时会差一个倍率（zoom 0.77 时
+   * clientWidth 是缩放前值、rect 是缩放后值），导致误判「放得下」而继续裁字。
+   * 复用同一个 Range 实例，避免每次新建。
+   */
+  let measureRange = null;
+  function textFitsRow(row) {
+    if (!measureRange) measureRange = document.createRange();
+    measureRange.selectNodeContents(row);
+    return measureRange.getBoundingClientRect().width <= row.getBoundingClientRect().width;
+  }
+
+  /**
+   * 给一批行分配行内字号档位。
+   * - 有测量能力：从最大档位起逐级尝试，实测宽度放得下即停；最小档位即便仍放不下也用它
+   *   （由 .slot-row 的 overflow:hidden 兜底）。整轮「先全部写入、再统一读取」，
+   *   最多 4 轮 = 4 次布局，避免逐行读写造成的布局抖动。
+   * - 无测量能力：按字数判定（桩环境）。
+   * @param {HTMLElement[]} targets 需要定档位的行
+   */
+  function applyRowFonts(targets) {
+    const named = [];
+    for (const row of targets) {
+      if (String(row.textContent).length) named.push(row);
+      else row.style.fontSize = ""; // 空行清掉残留的行内字号
     }
-    row.style.fontSize = size;
+    if (!named.length) return;
+
+    if (!CAN_MEASURE_TEXT) {
+      for (const row of named) {
+        const base = tierBaseByLength(row.textContent);
+        row.style.fontSize = base ? `${Math.round(base * fontScale)}px` : "";
+      }
+      return;
+    }
+
+    let pending = named;
+    for (let i = 0; i < FONT_SIZE_TIERS.length; i++) {
+      const base = FONT_SIZE_TIERS[i];
+      for (const row of pending) row.style.fontSize = base ? `${Math.round(base * fontScale)}px` : "";
+      if (i === FONT_SIZE_TIERS.length - 1) break; // 最小档位：放不下也用它
+      const rest = [];
+      for (const row of pending) if (!textFitsRow(row)) rest.push(row);
+      if (!rest.length) break;
+      pending = rest;
+    }
   }
 
   /**
    * 应用名单区字号系数（设置面板「字体大小」）：
    * ① 更新 body 上的 CSS 变量 --name-size（42×s）/ --name-size-center（46×s）；
    * ② 更新行高/视口变量 --row-h / --viewport-h（≤1.5 恒为 80/240）并刷新当前行高；
-   * ③ 档位行内字号需重跑 applyRowFont 刷已填各行（空行不受影响）。
+   * ③ 档位行内字号需重跑 applyRowFonts 刷已填各行（按新字号重新量宽定档）。
    * 行高与位移同源（都用 rowH）：滚动始终对齐行边界，不会露白。
    * @param {number} value 目标系数
    * @returns {number} 归一化后的系数
@@ -264,7 +311,7 @@
     rowH = rowHeightFor(s);
     document.body.style.setProperty("--row-h", `${rowH}px`);
     document.body.style.setProperty("--viewport-h", `${viewportHeightFor(s)}px`);
-    rows.forEach((row) => applyRowFont(row, row.textContent));
+    applyRowFonts(rows);
     return s;
   }
 
@@ -293,10 +340,9 @@
    */
   function fillReel(seq) {
     rows.forEach((row, i) => {
-      const name = i < seq.length ? seq[i] : "";
-      row.textContent = name;
-      applyRowFont(row, name);
+      row.textContent = i < seq.length ? seq[i] : "";
     });
+    applyRowFonts(rows);
   }
 
   /** 每帧只更新条带位移；行文本已由 fillReel 一次填好（位移与 CSS 行高同源 rowH） */
@@ -350,6 +396,7 @@
     renderFrame(seq, midIdx);
     const hitRow = rows[midIdx + CENTER];
     hitRow.classList.add("center", "hit");
+    applyRowFonts([hitRow]); // 中央行字号更大（46 而非 42 基准），按新字号重新量宽定档
   }
 
   // ---------- 抽取入口 ----------

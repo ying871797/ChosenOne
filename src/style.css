@@ -562,8 +562,13 @@ body[data-scheme="chalk"][data-theme="light"] .bg-fx .dust {
   inset: 0;
   background: var(--overlay-bg);
   display: flex;
-  align-items: center;
-  justify-content: center;
+  /* ⚠️ 面板可能高于视口（系数 1.0 时面板 511px > 设计窗高 375px），必须允许滚动；
+   *    且不能用 align-items:center —— flex 居中会把「上溢」的部分推出滚动区，顶部永远滚不到。
+   *    改为子元素 .panel 用 margin:auto：放得下时居中，放不下时退化为顶部对齐 + 两端都可滚到。 */
+  overflow-y: auto;
+  padding: 12px 0;
+  align-items: flex-start;
+  justify-content: flex-start;
   z-index: 10;
 }
 
@@ -580,6 +585,9 @@ body[data-scheme="chalk"][data-theme="light"] .bg-fx .dust {
   border-radius: var(--radius);
   padding: 24px 28px 20px;
   width: 360px;
+  /* margin:auto 与 .overlay 的可滚动配合：能放下时四向居中，放不下时上下 auto 归零、贴顶起排，
+   * 从而两端都能滚到（若改用 .overlay 的 align-items:center，顶部会永远滚不到）。 */
+  margin: auto;
   box-shadow: var(--shadow), inset 0 1px 0 rgba(255, 255, 255, 0.07);
 }
 

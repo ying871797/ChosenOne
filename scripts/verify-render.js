@@ -190,7 +190,46 @@ async function main() {
         const longOk = longCases.every((c) => c.over <= 0);
         console.log(`PASS 视口宽=${data.vpW} 高=${data.vpH} 行数=${data.rows} 中心命中=${data.centerClass} 中央文本=${JSON.stringify(data.centerRowText)} 字号链=${font.before}→${font.after}(${font.display}) 行高=${font.rowH} 视口=${font.viewportH} 矩形比=${vpRatio.toFixed(3)}`);
         console.log(`${longOk ? 'PASS' : 'FAIL'} 长名降档(6字/3.2×) ` + longCases.map(c => `${c.ww}×${c.zh}/zoom${c.zoom}: ${c.inline} 文字${c.textW}≤行${c.rowW}${c.over <= 0 ? '' : ` 裁${c.over}px!`}`).join(' | '));
-        process.exitCode = longOk ? 0 : 1;
+
+        // ③ 几何不变量（显式注入设计视口 800 × 设计窗高 375，zoom 应为 1）：
+        //    (a) 非名单区高度 = main.js 的 DESIGN_CHROME_H（135）—— 手写常数与紧凑节奏 CSS 的耦合点；
+        //    (b) 主界面无纵向溢出（不出现页面滚动条）；
+        //    (c) 设置面板两端可达：放得下则居中；放不下则遮罩可滚动且能滚到「关闭」按钮。
+        //    历史回归：窗高压到 375 后设置面板 511px 被上下裁掉，标题与关闭按钮均不可见。
+        //    先复位字号系数到 1.0×（上一组长名门把它拖到了上限，而本组不变量定义在 1.0×）。
+        await evaluate(`(() => { const i = document.getElementById('fontScaleInput'); i.value = '1'; i.dispatchEvent(new Event('input', { bubbles: true })); })()`);
+        await send('Emulation.setDeviceMetricsOverride', { width: 800, height: 375, deviceScaleFactor: 1, mobile: false });
+        await new Promise(r => setTimeout(r, 300));
+        const geo = JSON.parse(await evaluate(`(() => {
+          const q = s => document.querySelector(s);
+          const innerH = window.innerHeight;
+          const vpH = Math.round(q('.slot-viewport').getBoundingClientRect().height);
+          const zoom = Number(getComputedStyle(q('.ui-shell')).zoom);
+          const pageOverflow = document.documentElement.scrollHeight > innerH + 1;
+          const ov = q('.overlay');
+          const ovs = getComputedStyle(ov);
+          const scrollable = ovs.overflowY === 'auto' || ovs.overflowY === 'scroll';
+          ov.hidden = false;
+          ov.scrollTop = 0;
+          const panel = q('.panel');
+          const panelTop = Math.round(panel.getBoundingClientRect().top);
+          const panelH = Math.round(panel.getBoundingClientRect().height);
+          ov.scrollTop = ov.scrollHeight;
+          const cr = q('#panelCloseBtn').getBoundingClientRect();
+          const closeReachable = cr.top >= 0 && cr.bottom <= innerH + 1;
+          ov.scrollTop = 0;
+          ov.hidden = true;
+          return JSON.stringify({ innerH, chromeH: innerH - vpH, zoom, pageOverflow, scrollable, panelTop, panelH, closeReachable, closeBottom: Math.round(cr.bottom) });
+        })()`));
+        const geoOk =
+          geo.innerH === 375 &&
+          geo.chromeH === 135 &&
+          geo.zoom === 1 &&
+          !geo.pageOverflow &&
+          (geo.panelTop >= 0 || geo.scrollable) &&
+          geo.closeReachable;
+        console.log(`${geoOk ? 'PASS' : 'FAIL'} 几何不变量(非名单区=${geo.chromeH} 期望135 | zoom=${geo.zoom} 期望1 | 面板高=${geo.panelH} 顶端=${geo.panelTop} 可滚动=${geo.scrollable} 关闭按钮可达=${geo.closeReachable} 下边=${geo.closeBottom} | 页面溢出=${geo.pageOverflow})`);
+        process.exitCode = longOk && geoOk ? 0 : 1;
       } else {
         console.log(`FAIL 字号链 ${JSON.stringify(font)} vpRatio=${vpRatio}（期望 42→105px 行高 134px 视口 402px 矩形比 1.675 恢复 42/80px 读数 2.5×）`);
         process.exitCode = 1;
